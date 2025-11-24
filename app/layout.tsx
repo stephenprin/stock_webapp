@@ -14,7 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Signal AI",
-  description: "Track real time stock prices, news and get personalized company insights",
+  description:
+    "Track real time stock prices, news and get personalized company insights",
   icons: {
     icon: "/favicon.ico",
   },
