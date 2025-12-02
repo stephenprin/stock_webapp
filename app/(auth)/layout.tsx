@@ -1,23 +1,20 @@
 import Header from "@/components/Header";
-import Image from "next/image";
+import { LogoWordmark } from "@/components/LogoWordmark";
 import Link from "next/link";
+import Image from "next/image";
 import React from "react";
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
     <main className="auth-layout">
       <section className="auth-left-section scrollbar-hide-default">
-        <Link href="/" className="auth-logo">
-          <Image
-            src="/assets/icons/logo.svg"
-            alt="Signalist logo"
-            width={140}
-            height={32}
-            className="h-8 w-auto"
-          />
+        <Link href="/" className="auth-logo inline-block">
+          <LogoWordmark />
         </Link>
 
-        <div className="pb-6 lg:pb-8 flex-1">{children}</div>
+        <div className="pb-6 lg:pb-8 flex-1 flex items-center justify-center">
+          {children}
+        </div>
       </section>
 
       <section className="auth-right-section">
