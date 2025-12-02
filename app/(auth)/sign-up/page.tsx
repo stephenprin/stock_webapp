@@ -47,10 +47,15 @@ const SignUp = () => {
   };
 
   return (
-    <>
-      <h1 className="form-title">Sign Up & Personalize</h1>
+    <div className="w-full max-w-md mx-auto">
+      <h1 className="text-3xl md:text-4xl font-semibold text-white text-center">
+        Create your account
+      </h1>
+      <p className="mt-2 text-sm text-gray-400 mb-14 text-center">
+        Welcome! Personalize your experience.
+      </p>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <InputField
           name="fullName"
           label="Full Name"
@@ -124,7 +129,7 @@ const SignUp = () => {
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="yellow-btn w-full mt-5"
+          className="green-btn w-full mt-5"
         >
           {isSubmitting ? "Creating Account" : "Start Your Investing Journey"}
         </Button>
@@ -135,7 +140,7 @@ const SignUp = () => {
           href="/sign-in"
         />
       </form>
-    </>
+    </div>
   );
 };
 export default SignUp;

@@ -23,10 +23,15 @@ const SignIn = () => {
   const onSubmit = async (data: SignInFormData) => {};
 
   return (
-    <>
-      <h1 className="form-title">Welcome back</h1>
+    <div className="w-full max-w-md mx-auto">
+      <h1 className="text-3xl md:text-4xl font-semibold text-white text-center">
+        Welcome back
+      </h1>
+      <p className="mt-2 text-sm text-gray-400 mb-14 text-center">
+        Sign in to continue your personalized investing.
+      </p>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <InputField
           name="email"
           label="Email"
@@ -52,7 +57,7 @@ const SignIn = () => {
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="yellow-btn w-full mt-5"
+          className="green-btn w-full mt-5"
         >
           {isSubmitting ? "Signing In" : "Sign In"}
         </Button>
@@ -63,7 +68,7 @@ const SignIn = () => {
           href="/sign-up"
         />
       </form>
-    </>
+    </div>
   );
 };
 export default SignIn;
