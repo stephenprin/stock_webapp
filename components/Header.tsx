@@ -4,7 +4,7 @@ import NavItems from "./NavItems";
 import UserDropdown from "./UserDropdown";
 import { LogoWordmark } from "./LogoWordmark";
 
-function Header() {
+function Header({ user }: { user: User }) {
   return (
     <header className="sticky top-0 header">
       <div className="container header-wrapper">
@@ -15,7 +15,7 @@ function Header() {
           <NavItems />
         </nav>
 
-        <UserDropdown />
+        <UserDropdown user={user} />
       </div>
     </header>
   );

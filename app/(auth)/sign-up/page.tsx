@@ -11,11 +11,15 @@ import {
 } from "@/lib/constants";
 import { CountrySelectField } from "@/components/forms/CountrySelectField";
 import FooterLink from "@/components/forms/FooterLink";
+import { toast } from "sonner";
 
 import { useRouter } from "next/navigation";
+import { signUpWithEmail } from "@/lib/actions/auth.actions";
+import { useState } from "react";
 
 const SignUp = () => {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
   const {
     register,
     handleSubmit,
@@ -35,15 +39,29 @@ const SignUp = () => {
   });
 
   const onSubmit = async (data: SignUpFormData) => {
-    // try {
-    //     const result = await signUpWithEmail(data);
-    //     if(result.success) router.push('/');
-    // } catch (e) {
-    //     console.error(e);
-    //     toast.error('Sign up failed', {
-    //         description: e instanceof Error ? e.message : 'Failed to create an account.'
-    //     })
-    // }
+    router.push("/creating-account");
+    try {
+      setLoading(true);
+
+      await new Promise((resolve) => setTimeout(resolve, 8000));
+
+      const result = await signUpWithEmail(data);
+      if (result.success) {
+        toast.success("Account created successfully!");
+        router.push("/");
+      } else {
+        toast.error("Sign up failed", {
+          description:
+            result.error || "Failed to create an account. Please try again.",
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Sign up failed", {
+        description:
+          e instanceof Error ? e.message : "Failed to create an account.",
+      });
+    }
   };
 
   return (
@@ -59,7 +77,7 @@ const SignUp = () => {
         <InputField
           name="fullName"
           label="Full Name"
-          placeholder="John Doe"
+          placeholder="Mat Prince"
           register={register}
           error={errors.fullName}
           validation={{ required: "Full name is required", minLength: 2 }}
