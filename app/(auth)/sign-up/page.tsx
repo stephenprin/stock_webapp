@@ -15,11 +15,9 @@ import { toast } from "sonner";
 
 import { useRouter } from "next/navigation";
 import { signUpWithEmail } from "@/lib/actions/auth.actions";
-import { useState } from "react";
 
 const SignUp = () => {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
   const {
     register,
     handleSubmit,
@@ -39,29 +37,15 @@ const SignUp = () => {
   });
 
   const onSubmit = async (data: SignUpFormData) => {
-    router.push("/creating-account");
     try {
-      setLoading(true);
-
-      await new Promise((resolve) => setTimeout(resolve, 8000));
-
       const result = await signUpWithEmail(data);
-      if (result.success) {
-        toast.success("Account created successfully!");
-        router.push("/");
-      } else {
-        toast.error("Sign up failed", {
-          description:
-            result.error || "Failed to create an account. Please try again.",
-        });
-      }
-    } catch (e) {
+      if(result.success) router.push('/');
+  } catch (e) {
       console.error(e);
-      toast.error("Sign up failed", {
-        description:
-          e instanceof Error ? e.message : "Failed to create an account.",
-      });
-    }
+      toast.error('Sign up failed', {
+          description: e instanceof Error ? e.message : 'Failed to create an account.'
+      })
+  }
   };
 
   return (

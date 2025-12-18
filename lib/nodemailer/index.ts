@@ -20,7 +20,7 @@ export const sendWelcomeEmail = async ({
   );
 
   const mailOptions = {
-    from: `"Stock tracker" <princestock@jsmastery.pro>`,
+    from: `"Stock tracker" <stephenprince427@gmail.com>`,
     to: email,
     subject: `Welcome to Stock tracker - your stock market toolkit is ready!`,
     text: "Thanks for joining Stock tracker",

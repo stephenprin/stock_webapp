@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import InputField from "@/components/forms/InputField";
 import FooterLink from "@/components/forms/FooterLink";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { signInWithEmail } from "@/lib/actions/auth.actions";
 
 const SignIn = () => {
   const router = useRouter();
@@ -20,7 +22,24 @@ const SignIn = () => {
     mode: "onBlur",
   });
 
-  const onSubmit = async (data: SignInFormData) => {};
+  const onSubmit = async (data: SignInFormData) => {
+    try {
+      const result = await signInWithEmail(data);
+      if (result.success) {
+        toast.success("Signed in successfully!");
+        router.push("/");
+      } else {
+        toast.error("Sign in failed", {
+          description: result.error || "Invalid credentials. Please try again.",
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Sign in failed", {
+        description: e instanceof Error ? e.message : "Failed to sign in.",
+      });
+    }
+  };
 
   return (
     <div className="w-full max-w-md mx-auto">
