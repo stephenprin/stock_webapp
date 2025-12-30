@@ -1,6 +1,6 @@
 'use server';
 
-import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';
+import { getDateRange, validateArticle, formatArticle } from '@/lib/utils/utils';
 import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
 import { cache } from 'react';
 
@@ -72,7 +72,7 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
         collected.sort((a, b) => (b.datetime || 0) - (a.datetime || 0));
         return collected.slice(0, maxArticles);
       }
-      // If none collected, fall through to general news
+    
     }
 
     // General market news fallback or when no symbols provided
@@ -102,7 +102,6 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
   try {
     const token = process.env.FINNHUB_API_KEY ?? NEXT_PUBLIC_FINNHUB_API_KEY;
     if (!token) {
-      // If no token, log and return empty to avoid throwing per requirements
       console.error('Error in stock search:', new Error('FINNHUB API key is not configured'));
       return [];
     }
@@ -178,3 +177,80 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
     return [];
   }
 });
+
+export async function getStockQuote(symbol: string): Promise<{
+  currentPrice: number;
+  change: number;
+  changePercent: number;
+  previousClose: number;
+  high: number;
+  low: number;
+  open: number;
+} | null> {
+  try {
+    const token = process.env.FINNHUB_API_KEY ?? NEXT_PUBLIC_FINNHUB_API_KEY;
+    if (!token) {
+      console.error('FINNHUB API key is not configured');
+      return null;
+    }
+
+    const cleanSymbol = symbol.trim().toUpperCase();
+    const url = `${FINNHUB_BASE_URL}/quote?symbol=${encodeURIComponent(cleanSymbol)}&token=${token}`;
+    
+    // Cache for 1 minute (real-time data)
+    const data = await fetchJSON<{
+      c?: number; 
+      d?: number; 
+      dp?: number; 
+      h?: number;
+      l?: number; 
+      o?: number; 
+      pc?: number; 
+      t?: number; 
+    }>(url, 60);
+
+    if (!data || typeof data.c !== 'number') {
+      return null;
+    }
+
+    return {
+      currentPrice: data.c,
+      change: data.d || 0,
+      changePercent: data.dp || 0,
+      previousClose: data.pc || data.c,
+      high: data.h || data.c,
+      low: data.l || data.c,
+      open: data.o || data.c,
+    };
+  } catch (err) {
+    console.error('Error fetching stock quote for', symbol, err);
+    return null;
+  }
+}
+
+export async function getStockQuotesBatch(
+  symbols: string[]
+): Promise<Map<string, { currentPrice: number; change: number; changePercent: number }>> {
+  const quotes = new Map();
+  
+  // Fetch all quotes in parallel (with rate limiting consideration)
+  const results = await Promise.allSettled(
+    symbols.map(async (symbol) => {
+      const quote = await getStockQuote(symbol);
+      return { symbol, quote };
+    })
+  );
+
+  results.forEach((result) => {
+    if (result.status === 'fulfilled' && result.value.quote) {
+      const { symbol, quote } = result.value;
+      quotes.set(symbol, {
+        currentPrice: quote.currentPrice,
+        change: quote.change,
+        changePercent: quote.changePercent,
+      });
+    }
+  });
+
+  return quotes;
+}

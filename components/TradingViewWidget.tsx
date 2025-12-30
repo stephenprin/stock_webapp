@@ -2,7 +2,7 @@
 import { memo } from "react";
 
 import useTradingViewWidget from "./hooks/useTradingView";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils/utils";
 
 interface TradingViewWidgetProps {
   title?: string;

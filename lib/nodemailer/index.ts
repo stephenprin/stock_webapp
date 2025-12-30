@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { NEWS_SUMMARY_EMAIL_TEMPLATE, WELCOME_EMAIL_TEMPLATE } from "./templates";
+import { OTP_EMAIL_TEMPLATE } from "./otp-email";
 
 export const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -30,6 +31,30 @@ export const sendWelcomeEmail = async ({
   await transporter.sendMail(mailOptions);
 };
 
+export const sendOTPEmail = async ({
+  email,
+  name,
+  otpCode,
+}: {
+  email: string;
+  name: string;
+  otpCode: string;
+}) => {
+  const htmlTemplate = OTP_EMAIL_TEMPLATE.replace("{{name}}", name).replace(
+    "{{otpCode}}",
+    otpCode
+  );
+
+  const mailOptions = {
+    from: `"Stock tracker" <stephenprince427@gmail.com>`,
+    to: email,
+    subject: `Verify your email - Your OTP code`,
+    text: `Your OTP code is: ${otpCode}. This code expires in 10 minutes.`,
+    html: htmlTemplate,
+  };
+
+  await transporter.sendMail(mailOptions);
+};
 
 export const sendNewsSummaryEmail = async ({
   email,

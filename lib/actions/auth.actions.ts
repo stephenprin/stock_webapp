@@ -3,6 +3,7 @@
 import { auth } from "@/lib/better-auth/auth";
 import { inngest } from "@/lib/inngest/client";
 import { headers } from "next/headers";
+import { generateAndSendOTP } from "./otp.actions";
 
 export const signUpWithEmail = async ({
   email,
@@ -19,23 +20,74 @@ export const signUpWithEmail = async ({
     });
 
     if (response) {
-      await inngest.send({
-        name: "app/user.created",
-        data: {
-          email,
-          name: fullName,
-          country,
-          investmentGoals,
-          riskTolerance,
-          preferredIndustry,
-        },
+      // Send OTP for email verification
+      const otpResult = await generateAndSendOTP({
+        email,
+        name: fullName,
       });
+
+      if (!otpResult.success) {
+        console.error("Failed to send OTP:", otpResult.error);
+        // Still return success but mark that OTP sending failed
+        return {
+          success: true,
+          data: response,
+          requiresOTP: true,
+          otpSent: false,
+          error: "Account created but failed to send OTP",
+        };
+      }
+
+      // Store user profile data temporarily (we'll send welcome email after OTP verification)
+      // For now, just mark that OTP is required
+      return {
+        success: true,
+        data: response,
+        requiresOTP: true,
+        otpSent: true,
+      };
     }
 
-    return { success: true, data: response };
+    return { success: false, error: "Sign up failed" };
   } catch (e: any) {
     console.log("Sign up failed", e);
-    return { success: false, error: "Sign up failed" };
+    return { success: false, error: e.message || "Sign up failed" };
+  }
+};
+
+export const completeSignUp = async ({
+  email,
+  fullName,
+  country,
+  investmentGoals,
+  riskTolerance,
+  preferredIndustry,
+}: {
+  email: string;
+  fullName: string;
+  country: string;
+  investmentGoals: string;
+  riskTolerance: string;
+  preferredIndustry: string;
+}) => {
+  try {
+    // Send welcome email after OTP verification
+    await inngest.send({
+      name: "app/user.created",
+      data: {
+        email,
+        name: fullName,
+        country,
+        investmentGoals,
+        riskTolerance,
+        preferredIndustry,
+      },
+    });
+
+    return { success: true };
+  } catch (e: any) {
+    console.log("Failed to complete signup:", e);
+    return { success: false, error: "Failed to complete signup" };
   }
 };
 
@@ -56,5 +108,15 @@ export const signOut = async () => {
   } catch (e) {
       console.log('Sign out failed', e)
       return { success: false, error: 'Sign out failed' }
+  }
+}
+
+export const getSession = async () => {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    return { success: true, user: session?.user || null };
+  } catch (e) {
+    console.log('Get session failed', e);
+    return { success: false, user: null };
   }
 }

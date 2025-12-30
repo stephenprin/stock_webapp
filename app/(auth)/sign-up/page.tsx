@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import InputField from "@/components/forms/InputField";
@@ -11,6 +12,7 @@ import {
 } from "@/lib/constants";
 import { CountrySelectField } from "@/components/forms/CountrySelectField";
 import FooterLink from "@/components/forms/FooterLink";
+import OTPVerificationModal from "@/components/OTPVerificationModal";
 import { toast } from "sonner";
 
 import { useRouter } from "next/navigation";
@@ -18,6 +20,17 @@ import { signUpWithEmail } from "@/lib/actions/auth.actions";
 
 const SignUp = () => {
   const router = useRouter();
+  const [showOTPModal, setShowOTPModal] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const [userName, setUserName] = useState("");
+  const [userPassword, setUserPassword] = useState("");
+  const [userProfileData, setUserProfileData] = useState<{
+    country: string;
+    investmentGoals: string;
+    riskTolerance: string;
+    preferredIndustry: string;
+  } | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -39,13 +52,38 @@ const SignUp = () => {
   const onSubmit = async (data: SignUpFormData) => {
     try {
       const result = await signUpWithEmail(data);
-      if(result.success) router.push('/');
-  } catch (e) {
+      if (result.success) {
+        if (result.requiresOTP && result.otpSent) {
+          setUserEmail(data.email);
+          setUserName(data.fullName);
+          setUserPassword(data.password);
+          setUserProfileData({
+            country: data.country,
+            investmentGoals: data.investmentGoals,
+            riskTolerance: data.riskTolerance,
+            preferredIndustry: data.preferredIndustry,
+          });
+          setShowOTPModal(true);
+        } else if (!result.requiresOTP) {
+          router.push("/");
+        } else {
+          toast.error(result.error || "Failed to send OTP");
+        }
+      } else {
+        toast.error(result.error || "Sign up failed");
+      }
+    } catch (e) {
       console.error(e);
-      toast.error('Sign up failed', {
-          description: e instanceof Error ? e.message : 'Failed to create an account.'
-      })
-  }
+      toast.error("Sign up failed", {
+        description:
+          e instanceof Error ? e.message : "Failed to create an account.",
+      });
+    }
+  };
+
+  const handleOTPVerified = () => {
+    setShowOTPModal(false);
+  
   };
 
   return (
@@ -142,6 +180,15 @@ const SignUp = () => {
           href="/sign-in"
         />
       </form>
+
+      <OTPVerificationModal
+        open={showOTPModal}
+        email={userEmail}
+        name={userName}
+        password={userPassword}
+        userProfileData={userProfileData}
+        onVerified={handleOTPVerified}
+      />
     </div>
   );
 };

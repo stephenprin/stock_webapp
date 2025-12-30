@@ -23,7 +23,7 @@ export const getAuth = async () => {
       requireEmailVerification: false,
       minPasswordLength: 8,
       maxPasswordLength: 128,
-      autoSignIn: true,
+      autoSignIn: false,
     },
     plugins: [nextCookies()],
   });

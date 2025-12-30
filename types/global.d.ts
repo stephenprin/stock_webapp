@@ -221,6 +221,73 @@ declare global {
         threshold: number;
         changePercent?: number;
     };
+
+    type RateLimitConfig = {
+        maxAttempts: number;
+        windowMs: number; 
+        lockDurationMs?: number; 
+    };
+
+    type PortfolioHolding = {
+        _id?: string;
+        userId: string;
+        symbol: string;
+        companyName: string;
+        exchange?: string;
+        quantity: number;
+        averageCost: number;
+        totalCost: number;
+        currentPrice?: number;
+        marketValue?: number;
+        gainLoss?: number;
+        gainLossPercent?: number;
+        lastUpdated?: Date;
+        notes?: string;
+        createdAt: Date;
+        updatedAt: Date;
+    };
+
+    type PortfolioTransaction = {
+        _id?: string;
+        userId: string;
+        symbol: string;
+        transactionType: 'buy' | 'sell' | 'dividend' | 'split' | 'transfer';
+        quantity: number;
+        price: number;
+        totalAmount: number;
+        fees?: number;
+        date: Date;
+        notes?: string;
+        holdingId?: string;
+        createdAt: Date;
+        updatedAt: Date;
+    };
+
+    type PortfolioSummary = {
+        totalCost: number;
+        totalMarketValue: number;
+        totalGainLoss: number;
+        totalGainLossPercent: number;
+        dayGainLoss?: number;
+        dayGainLossPercent?: number;
+        holdingsCount: number;
+        positions: PortfolioHolding[];
+    };
+
+    type AssetAllocation = {
+        symbol: string;
+        companyName: string;
+        marketValue: number;
+        percentage: number;
+        quantity: number;
+        averageCost: number;
+        currentPrice?: number;
+        gainLoss?: number;
+        gainLossPercent?: number;
+    };
+
+
+    
 }
 
 export {};

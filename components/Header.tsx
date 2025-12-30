@@ -8,7 +8,7 @@ function Header({ user }: { user: User }) {
   return (
     <header className="sticky top-0 header">
       <div className="container header-wrapper">
-        <Link href="/" className="flex items-center gap-2 cursor-pointer">
+        <Link href="/dashboard" className="flex items-center gap-2 cursor-pointer">
           <LogoWordmark />
         </Link>
         <nav className="hidden sm:block">

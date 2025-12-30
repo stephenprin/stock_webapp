@@ -7,7 +7,7 @@ import {
   TOP_STORIES_WIDGET_CONFIG,
 } from "@/lib/constants";
 
-const Home = () => {
+const Dashboard = () => {
   const scriptUrl = `https://s3.tradingview.com/external-embedding/embed-widget-`;
 
   return (
@@ -52,4 +52,5 @@ const Home = () => {
   );
 };
 
-export default Home;
+export default Dashboard;
+

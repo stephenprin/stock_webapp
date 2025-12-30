@@ -2,7 +2,7 @@ import { getNews } from "../actions/finnhub.actions";
 import { getAllUsersForNewsEmail } from "../actions/user.actions";
 import { getWatchlistSymbolsByEmail } from "../actions/watchlist.actiond";
 import { sendNewsSummaryEmail, sendWelcomeEmail } from "../nodemailer";
-import { getFormattedTodayDate } from "../utils";
+import { getFormattedTodayDate } from "../utils/utils";
 import { inngest } from "./client";
 import {
   NEWS_SUMMARY_EMAIL_PROMPT,
