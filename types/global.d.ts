@@ -71,6 +71,7 @@ declare global {
         id: string;
         name: string;
         email: string;
+        subscriptionPlan?: SubscriptionPlan;
     };
 
     type UserForNewsEmail = {
@@ -286,6 +287,26 @@ declare global {
         gainLossPercent?: number;
     };
 
+    // Subscription & Billing Types
+    type SubscriptionPlan = "free" | "pro" | "enterprise";
+
+    type SubscriptionLimits = {
+        maxStocks: number | null; // null = unlimited
+        alerts: "basic" | "advanced" | "custom";
+        newsPriority: "standard" | "priority" | "premium";
+        analytics: boolean;
+        apiAccess: boolean;
+        multiplePortfolios: boolean;
+        teamCollaboration: boolean;
+        dedicatedSupport: boolean;
+    };
+
+    type SubscriptionStatus = {
+        plan: SubscriptionPlan;
+        customerId?: string;
+        status?: "active" | "inactive" | "cancelled" | "past_due";
+        currentPeriodEnd?: Date;
+    };
 
     
 }

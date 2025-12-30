@@ -1,25 +1,51 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { getPortfolioHoldings, getAssetAllocation } from "@/lib/actions/portfolio.actions";
 import { PortfolioSummary, AssetAllocation } from "@/lib/services/portfolio-analytics.service";
-import { PortfolioHolding } from "@/database/models/portfolio-holding.model";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, TrendingUp, TrendingDown, DollarSign, PieChart, RefreshCw } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, DollarSign, PieChart, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import PortfolioHoldingsTable from "@/components/portfolio/PortfolioHoldingsTable";
 import AddPositionDialog from "@/components/portfolio/AddPositionDialog";
 import AssetAllocationChart from "@/components/portfolio/AssetAllocationChart";
 import PortfolioPerformanceChart from "@/components/portfolio/PortfolioPerformanceChart";
+import SubscriptionBadge from "@/components/billing/SubscriptionBadge";
+import UpgradeDialog from "@/components/billing/UpgradeDialog";
+import { useSubscription } from "@/lib/hooks/useSubscription";
+import { getSubscriptionLimits } from "@/lib/utils/subscription";
 
 export default function PortfolioPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [holdings, setHoldings] = useState<PortfolioHolding[]>([]);
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
   const [allocation, setAllocation] = useState<AssetAllocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
+  
+  const { plan, isFree, isPro } = useSubscription();
+  const [stockLimit, setStockLimit] = useState<number | null>(null);
+
+  // Handle successful upgrade redirect from Stripe
+  useEffect(() => {
+    const upgraded = searchParams.get("upgraded");
+    if (upgraded === "true") {
+      toast.success("Upgrade successful! Your subscription is now active.", {
+        duration: 5000,
+      });
+      // Remove query param from URL
+      router.replace("/portfolio");
+      // Reload subscription data
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    }
+  }, [searchParams, router]);
 
   const loadPortfolio = async () => {
     try {
@@ -57,6 +83,16 @@ export default function PortfolioPage() {
     loadPortfolio();
   }, []);
 
+  useEffect(() => {
+    const fetchLimit = async () => {
+      const limits = await getSubscriptionLimits(plan);
+      setStockLimit(limits.maxStocks);
+    };
+    if (plan) {
+      fetchLimit();
+    }
+  }, [plan]);
+
   const handlePositionAdded = () => {
     setAddDialogOpen(false);
     loadPortfolio();
@@ -78,8 +114,24 @@ export default function PortfolioPage() {
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">My Portfolio</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold text-white">My Portfolio</h1>
+            <SubscriptionBadge />
+          </div>
           <p className="text-gray-400">Track your investments and performance</p>
+          {isFree && stockLimit !== null && (
+            <div className="flex items-center gap-2 mt-2 text-sm text-gray-400">
+              <Sparkles className="h-4 w-4" />
+              <span>
+                Using {holdings.length}/{stockLimit} stocks
+              </span>
+              {holdings.length >= stockLimit && (
+                <span className="text-yellow-500 font-medium">
+                  • Limit reached
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex gap-3">
           <Button
@@ -91,9 +143,30 @@ export default function PortfolioPage() {
             <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
           </Button>
+          {isFree && (
+            <Button
+              variant="outline"
+              onClick={() => setUpgradeDialogOpen(true)}
+              className="flex items-center gap-2 border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10"
+            >
+              <Sparkles className="h-4 w-4" />
+              Upgrade
+            </Button>
+          )}
+          {isPro && (
+            <Button
+              variant="outline"
+              onClick={() => setUpgradeDialogOpen(true)}
+              className="flex items-center gap-2 border-purple-500/50 text-purple-500 hover:bg-purple-500/10"
+            >
+              <Sparkles className="h-4 w-4" />
+              Switch to Enterprise
+            </Button>
+          )}
           <Button
             onClick={() => setAddDialogOpen(true)}
             className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-gray-900"
+            disabled={isFree && stockLimit !== null && holdings.length >= stockLimit}
           >
             <Plus className="h-4 w-4" />
             Add Position
@@ -270,6 +343,16 @@ export default function PortfolioPage() {
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
         onPositionAdded={handlePositionAdded}
+      />
+      
+      <UpgradeDialog
+        open={upgradeDialogOpen}
+        onOpenChange={setUpgradeDialogOpen}
+        targetPlan={plan === "pro" ? "enterprise" : "pro"}
+        reason={isFree && stockLimit !== null && holdings.length >= stockLimit 
+          ? `You've reached the limit of ${stockLimit} stocks for your free plan. Upgrade to Pro for unlimited stock tracking.`
+          : undefined
+        }
       />
     </div>
   );

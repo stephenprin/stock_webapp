@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import OTPInput from "@/components/forms/OTPInput";
 import { verifyOTP, resendOTP } from "@/lib/actions/otp.actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -74,13 +74,13 @@ export default function OTPVerificationModal({
   }, [open]);
 
   const handleChange = (index: number, value: string) => {
-    if (value.length > 1) return; // Only allow single digit
+    if (value.length > 1) return; 
 
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
 
-    // Auto-focus next input
+   
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
@@ -157,11 +157,10 @@ export default function OTPVerificationModal({
           router.push("/sign-in");
         }
       } else {
-        // Show specific error message
+    
         const errorMessage = result.error || "Invalid OTP code";
         toast.error(errorMessage);
         
-        // If rate limited, show additional info
         if (result.rateLimitInfo) {
           if (result.rateLimitInfo.lockedUntil) {
             const minutesLeft = Math.ceil(
@@ -211,7 +210,6 @@ export default function OTPVerificationModal({
         const errorMessage = result.error || "Failed to resend OTP";
         toast.error(errorMessage);
         
-        // Show rate limit info if available
         if (result.rateLimitInfo) {
           if (result.rateLimitInfo.lockedUntil) {
             const minutesLeft = Math.ceil(
@@ -253,21 +251,18 @@ export default function OTPVerificationModal({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* OTP Input Fields */}
+    
           <div className="flex justify-center gap-2" onPaste={handlePaste}>
             {otp.map((digit, index) => (
-              <Input
+              <OTPInput
                 key={index}
                 ref={(el) => {
                   inputRefs.current[index] = el;
                 }}
-                type="text"
-                inputMode="numeric"
-                maxLength={1}
                 value={digit}
-                onChange={(e) => handleChange(index, e.target.value)}
-                onKeyDown={(e) => handleKeyDown(index, e)}
-                className="w-12 h-14 text-center text-2xl font-semibold"
+                index={index}
+                onValueChange={handleChange}
+                onKeyDown={handleKeyDown}
                 disabled={isVerifying}
               />
             ))}

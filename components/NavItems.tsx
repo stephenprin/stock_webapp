@@ -33,8 +33,8 @@ function NavItems() {
 
   return (
     <>
-      <ul className="flex flex-col sm:flex-row p-2 gap-3 sm:gap-10 font-medium">
-        {NAV_ITEMS.map(({ href, label }) => {
+    <ul className="flex flex-col sm:flex-row p-2 gap-3 sm:gap-10 font-medium">
+      {NAV_ITEMS.map(({ href, label }) => {
           // Make Search navigation item trigger the search command dialog
           if (href === "/search") {
             return (
@@ -52,20 +52,20 @@ function NavItems() {
             );
           }
 
-          return (
-            <li key={href}>
-              <Link
-                href={href}
-                className={`hover:text-yellow-500 transition-colors ${
-                  isActive(href) ? "text-gray-100" : ""
-                }`}
-              >
-                {label}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+        return (
+          <li key={href}>
+            <Link
+              href={href}
+              className={`hover:text-yellow-500 transition-colors ${
+                isActive(href) ? "text-gray-100" : ""
+              }`}
+            >
+              {label}
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
       <StockSearchCommand open={searchOpen} onOpenChange={setSearchOpen} />
     </>
   );

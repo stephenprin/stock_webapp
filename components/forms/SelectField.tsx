@@ -19,7 +19,7 @@ const SelectField = ({
 }: SelectFieldProps) => {
   return (
     <div className="space-y-2">
-      <Label htmlFor={name} className="form-label">
+      <Label htmlFor={name} className="text-sm font-medium text-gray-300">
         {label}
       </Label>
 
@@ -31,7 +31,7 @@ const SelectField = ({
         }}
         render={({ field }) => (
           <Select value={field.value} onValueChange={field.onChange}>
-            <SelectTrigger className="select-trigger">
+            <SelectTrigger className="w-full h-12 bg-gray-700 border border-gray-600 text-gray-200 hover:bg-gray-600">
               <SelectValue placeholder={placeholder} />
             </SelectTrigger>
             <SelectContent className="bg-gray-800 border-gray-600 text-white">
@@ -45,7 +45,7 @@ const SelectField = ({
                 </SelectItem>
               ))}
             </SelectContent>
-            {error && <p className="text-sm text-red-500">{error.message}</p>}
+      {error && <p className="text-sm text-red-400 mt-1">{error.message}</p>}
           </Select>
         )}
       />

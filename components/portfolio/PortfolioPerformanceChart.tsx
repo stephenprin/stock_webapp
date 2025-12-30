@@ -1,6 +1,4 @@
 "use client";
-
-import { PortfolioHolding } from "@/database/models/portfolio-holding.model";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 interface PortfolioPerformanceChartProps {

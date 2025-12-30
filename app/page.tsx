@@ -99,6 +99,8 @@ const pricingPlans = [
   {
     name: "Free",
     price: 0,
+    priceDisplay: "Free",
+    revenueLimit: "Free forever",
     description: "Perfect for getting started",
     features: [
       "Track up to 10 stocks",
@@ -107,11 +109,15 @@ const pricingPlans = [
       "Real-time market data",
       "Community support",
     ],
+    buttonText: "Start for free",
+    buttonVariant: "default" as const,
     popular: false,
   },
   {
     name: "Pro",
     price: 9,
+    priceDisplay: "$9",
+    revenueLimit: "per month",
     description: "For serious investors",
     features: [
       "Unlimited stock tracking",
@@ -122,11 +128,15 @@ const pricingPlans = [
       "Email & SMS alerts",
       "Priority support",
     ],
+    buttonText: "Get started",
+    buttonVariant: "secondary" as const,
     popular: true,
   },
   {
     name: "Enterprise",
     price: 29,
+    priceDisplay: "$29",
+    revenueLimit: "per month",
     description: "For professional traders",
     features: [
       "Everything in Pro",
@@ -138,6 +148,8 @@ const pricingPlans = [
       "Dedicated support",
       "Custom alerts & workflows",
     ],
+    buttonText: "Let's chat",
+    buttonVariant: "outline" as const,
     popular: false,
   },
 ];
@@ -440,10 +452,10 @@ export default function HomePage() {
           className="max-w-4xl mx-auto mb-16"
         >
           <h2 className="text-4xl md:text-5xl font-bold mb-4 text-center text-foreground">
-            Simple, Transparent Pricing
+            Start for Free
           </h2>
           <p className="text-lg text-muted-foreground text-center max-w-2xl mx-auto">
-            Choose the plan that fits your investment needs. All plans include real-time market data.
+            Choose the plan that fits your investment needs. All plans include real-time market data. Cancel anytime.
           </p>
         </motion.div>
 
@@ -452,7 +464,7 @@ export default function HomePage() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
-          className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto"
+          className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto"
         >
           {pricingPlans.map((plan, index) => {
             const isPopular = plan.popular;
@@ -461,14 +473,15 @@ export default function HomePage() {
               <motion.div
                 key={plan.name}
                 variants={itemVariants}
-                whileHover={{ y: -8, scale: isPopular ? 1.03 : 1.02 }}
+                whileHover={{ y: -4 }}
                 transition={{ type: "spring", stiffness: 300 }}
+                className="relative"
               >
                 <Card
-                  className={`relative transition-all duration-300 ${
+                  className={`relative h-full flex flex-col transition-all duration-300 ${
                     isPopular
-                      ? "border-primary/50 shadow-xl ring-2 ring-primary/20"
-                      : "hover:shadow-lg hover:border-primary/30"
+                      ? "border-2 border-primary shadow-xl"
+                      : "border hover:shadow-lg"
                   }`}
                 >
                   {isPopular && (
@@ -479,58 +492,76 @@ export default function HomePage() {
                       transition={{ delay: 0.3 }}
                       className="absolute -top-3 left-1/2 -translate-x-1/2"
                     >
-                      <Badge className="px-3 py-1 text-xs font-semibold">
+                      <Badge className="px-3 py-1 text-xs font-semibold bg-primary text-primary-foreground">
                         Most Popular
                       </Badge>
                     </motion.div>
                   )}
-                  <CardHeader className="text-center pb-4">
-                    <CardTitle className="text-2xl font-bold text-foreground">
+                  <CardHeader className="text-center pb-6 pt-8">
+                    <CardTitle className="text-2xl font-bold text-foreground mb-2">
                       {plan.name}
                     </CardTitle>
-                    <CardDescription className="mt-2">
-                      {plan.description}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="text-center">
-                    <div className="mb-6">
-                      <span className="text-5xl font-bold text-foreground">
-                        ${plan.price}
-                      </span>
-                      <span className="text-muted-foreground ml-1">/month</span>
+                    <div className="mt-4 mb-2">
+                      <div className="text-5xl md:text-6xl font-bold text-foreground leading-none">
+                        {plan.priceDisplay}
+                      </div>
+                      {plan.price > 0 && (
+                        <span className="text-muted-foreground text-lg ml-1">
+                          /month
+                        </span>
+                      )}
                     </div>
-                    <ul className="space-y-3 text-left">
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {plan.revenueLimit}
+                    </p>
+                  </CardHeader>
+                  <CardContent className="flex-1 pb-6">
+                    <ul className="space-y-3.5">
                       {plan.features.map((feature, featureIndex) => (
                         <motion.li
                           key={feature}
                           initial={{ opacity: 0, x: -20 }}
                           whileInView={{ opacity: 1, x: 0 }}
                           viewport={{ once: true }}
-                          transition={{ delay: 0.4 + featureIndex * 0.1 }}
-                          className="flex items-start gap-3 text-sm"
+                          transition={{ delay: 0.4 + featureIndex * 0.05 }}
+                          className="flex items-start gap-3"
                         >
                           <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                          <span className="text-foreground">{feature}</span>
+                          <span className="text-sm text-foreground leading-relaxed">
+                            {feature}
+                          </span>
                         </motion.li>
                       ))}
                     </ul>
                   </CardContent>
-                  <CardFooter className="pt-4">
+                  <CardFooter className="pt-0 pb-6">
                     {!isAuthenticated ? (
                       <Button
-                        className="w-full h-11"
-                        variant={isPopular ? "default" : "outline"}
+                        className={`w-full h-12 text-base font-medium ${
+                          plan.buttonVariant === "default"
+                            ? "bg-primary hover:bg-primary/90"
+                            : plan.buttonVariant === "secondary"
+                            ? "bg-muted hover:bg-muted/80 text-foreground"
+                            : "border-2"
+                        }`}
+                        variant={plan.buttonVariant}
                         onClick={() => router.push("/sign-up")}
                       >
-                        Get Started
+                        {plan.buttonText}
                       </Button>
                     ) : (
                       <Button
-                        className="w-full h-11"
-                        variant={isPopular ? "default" : "outline"}
+                        className={`w-full h-12 text-base font-medium ${
+                          plan.buttonVariant === "default"
+                            ? "bg-primary hover:bg-primary/90"
+                            : plan.buttonVariant === "secondary"
+                            ? "bg-muted hover:bg-muted/80 text-foreground"
+                            : "border-2"
+                        }`}
+                        variant={plan.buttonVariant}
                         onClick={handleGetStarted}
                       >
-                        {plan.price === 0 ? "Start Tracking" : "Upgrade Plan"}
+                        {plan.price === 0 ? "Start Tracking" : plan.buttonText}
                       </Button>
                     )}
                   </CardFooter>
@@ -545,9 +576,9 @@ export default function HomePage() {
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ delay: 0.5 }}
-          className="text-center text-sm text-muted-foreground mt-12"
+          className="text-center text-sm text-muted-foreground mt-16 max-w-2xl mx-auto"
         >
-          All plans include real-time market data. Cancel anytime. No commitment.
+          *Real-time market data included in all plans. No additional transaction fees. Cancel anytime.
         </motion.p>
       </section>
 

@@ -15,6 +15,7 @@ import {
   type AssetAllocation,
 } from "@/lib/services/portfolio-analytics.service";
 import { searchStocks } from "./finnhub.actions";
+import { enforceStockLimit } from "@/lib/utils/subscription";
 
 
 export async function getPortfolioHoldings(): Promise<{
@@ -60,39 +61,43 @@ export async function getPortfolioHoldings(): Promise<{
       const gainLossPercent =
         holding.totalCost > 0 ? (gainLoss / holding.totalCost) * 100 : 0;
 
-      return {
+      
+      const holdingObj = {
         ...holding,
+        _id: (holding._id.toString())?.toString() || String((holding as any)._id),
         currentPrice,
         marketValue,
         gainLoss,
         gainLossPercent,
         lastUpdated: new Date(),
       };
+
+      return holdingObj;
     });
 
-    // Update database with latest prices
+    // Update database with latest prices (using original _id)
     PortfolioHoldingModel.bulkWrite(
-      updatedHoldings.map((h) => ({
+      holdings.map((h, index) => ({
         updateOne: {
           filter: { _id: h._id, userId },
           update: {
             $set: {
-              currentPrice: h.currentPrice,
-              marketValue: h.marketValue,
-              gainLoss: h.gainLoss,
-              gainLossPercent: h.gainLossPercent,
-              lastUpdated: h.lastUpdated,
+              currentPrice: updatedHoldings[index].currentPrice,
+              marketValue: updatedHoldings[index].marketValue,
+              gainLoss: updatedHoldings[index].gainLoss,
+              gainLossPercent: updatedHoldings[index].gainLossPercent,
+              lastUpdated: updatedHoldings[index].lastUpdated,
             },
           },
         },
       }))
     ).catch((err) => console.error("Error updating holdings prices:", err));
 
-    const summary = calculatePortfolioSummary(updatedHoldings);
+    const summary = calculatePortfolioSummary(updatedHoldings as any);
 
     return {
       success: true,
-      holdings: updatedHoldings as PortfolioHolding[],
+      holdings: updatedHoldings as any,
       summary,
     };
   } catch (error: any) {
@@ -140,10 +145,25 @@ export async function addPosition(data: {
       };
     }
 
+    // Check if this is a new stock symbol (not an existing holding)
     const existingHolding = await PortfolioHoldingModel.findOne({
       userId,
       symbol: data.symbol.toUpperCase(),
     });
+
+    // If adding a new stock (not updating existing), check subscription limit
+    if (!existingHolding) {
+      const currentStockCount = await PortfolioHoldingModel.countDocuments({ userId });
+      const limitCheck = await enforceStockLimit(userId, currentStockCount);
+      
+      if (!limitCheck.allowed) {
+        return {
+          success: false,
+          error: limitCheck.reason || "Stock limit reached",
+          message: limitCheck.reason,
+        };
+      }
+    }
 
     const totalCost = data.quantity * data.price + (data.fees || 0);
 
@@ -442,9 +462,15 @@ export async function getTransactionHistory(limit: number = 50): Promise<{
       .limit(limit)
       .lean();
 
+    // Convert _id from ObjectId to string
+    const formattedTransactions = transactions.map((t) => ({
+      ...t,
+      _id: (t._id as any)?.toString() || String((t as any)._id),
+    }));
+
     return {
       success: true,
-      transactions: transactions as PortfolioTransaction[],
+      transactions: formattedTransactions as any,
     };
   } catch (error: any) {
     console.error("Error fetching transaction history:", error);

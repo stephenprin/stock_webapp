@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { PortfolioHolding } from "@/database/models/portfolio-holding.model";
 import { Button } from "@/components/ui/button";
 import {
   Table,

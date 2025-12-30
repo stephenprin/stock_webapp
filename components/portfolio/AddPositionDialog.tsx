@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Loader2, Check, ChevronsUpDown } from "lucide-react";
 import { useDebounce } from "@/lib/utils/debounce";
 import { cn } from "@/lib/utils/utils";
+import UpgradeDialog from "@/components/billing/UpgradeDialog";
 
 interface AddPositionDialogProps {
   open: boolean;
@@ -46,6 +47,8 @@ export default function AddPositionDialog({
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<StockWithWatchlistStatus[]>([]);
   const [searchingStocks, setSearchingStocks] = useState(false);
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<string>();
   
   const {
     register,
@@ -180,7 +183,13 @@ export default function AddPositionDialog({
         onPositionAdded();
         onOpenChange(false);
       } else {
-        toast.error(result.error || "Failed to add position");
+        // Check if this is an upgrade-required error
+        if (result.error && result.error.includes("Upgrade to Pro")) {
+          setUpgradeReason(result.error);
+          setUpgradeDialogOpen(true);
+        } else {
+          toast.error(result.error || "Failed to add position");
+        }
       }
     } catch (error) {
       console.error("Error adding position:", error);
@@ -214,6 +223,7 @@ export default function AddPositionDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-md">
         <DialogHeader className="pb-4">
@@ -476,6 +486,13 @@ export default function AddPositionDialog({
         </form>
       </DialogContent>
     </Dialog>
+    <UpgradeDialog
+      open={upgradeDialogOpen}
+      onOpenChange={setUpgradeDialogOpen}
+      targetPlan="pro"
+      reason={upgradeReason}
+    />
+  </>
   );
 }
 

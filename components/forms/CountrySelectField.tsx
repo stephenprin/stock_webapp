@@ -58,7 +58,7 @@ const CountrySelect = ({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="country-select-trigger"
+          className="w-full h-12 justify-between bg-gray-700 border border-gray-600 text-gray-200 hover:bg-gray-600"
         >
           {value ? (
             <span className="flex items-center gap-2">
@@ -124,7 +124,7 @@ export const CountrySelectField = ({
 }: CountrySelectProps) => {
   return (
     <div className="space-y-2">
-      <Label htmlFor={name} className="form-label">
+      <Label htmlFor={name} className="text-sm font-medium text-gray-300">
         {label}
       </Label>
       <Controller
@@ -137,8 +137,8 @@ export const CountrySelectField = ({
           <CountrySelect value={field.value} onChange={field.onChange} />
         )}
       />
-      {error && <p className="text-sm text-red-500">{error.message}</p>}
-      <p className="text-xs text-gray-500">
+      {error && <p className="text-sm text-red-400">{error.message}</p>}
+      <p className="text-xs text-gray-400">
         Helps us show market data and news relevant to you.
       </p>
     </div>

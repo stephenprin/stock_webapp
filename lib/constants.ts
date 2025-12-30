@@ -2,7 +2,7 @@ export const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/portfolio", label: "Portfolio" },
   { href: "/search", label: "Search" },
- { href: '/watchlist', label: 'Watchlist' },
+  { href: '/watchlist', label: 'Watchlist' },
 ];
 
 // Sign-up form select options
@@ -338,3 +338,34 @@ export const WATCHLIST_TABLE_HEADER = [
   "Alert",
   "Action",
 ];
+
+export const PLAN_FEATURES = {
+  pro: {
+    name: "Pro",
+    price: "$9",
+    period: "per month",
+    features: [
+      "Unlimited stock tracking",
+      "Advanced price alerts",
+      "Priority news summaries",
+      "Portfolio analytics",
+      "Email & SMS alerts",
+      "Priority support",
+    ],
+  },
+  enterprise: {
+    name: "Enterprise",
+    price: "$20",
+    period: "per month",
+    features: [
+      "Everything in Pro",
+      "API access",
+      "Custom integrations",
+      "Advanced analytics",
+      "Multiple portfolios",
+      "Team collaboration",
+      "Dedicated support",
+      "Custom alerts & workflows",
+    ],
+  },
+} as const;

@@ -1,4 +1,21 @@
-import { PortfolioHolding } from '@/database/models/portfolio-holding.model';
+export interface PortfolioHoldingPlain {
+  _id?: string;
+  userId: string;
+  symbol: string;
+  companyName: string;
+  exchange?: string;
+  quantity: number;
+  averageCost: number;
+  totalCost: number;
+  currentPrice?: number;
+  marketValue?: number;
+  gainLoss?: number;
+  gainLossPercent?: number;
+  lastUpdated?: Date;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface PortfolioSummary {
   totalCost: number;
@@ -8,7 +25,7 @@ export interface PortfolioSummary {
   dayGainLoss?: number;
   dayGainLossPercent?: number;
   holdingsCount: number;
-  positions: PortfolioHolding[];
+  positions: PortfolioHoldingPlain[];
 }
 
 export interface AssetAllocation {
@@ -33,7 +50,7 @@ export interface PerformanceMetric {
 
 
 export function calculatePortfolioSummary(
-  holdings: PortfolioHolding[]
+  holdings: PortfolioHoldingPlain[]
 ): PortfolioSummary {
   if (holdings.length === 0) {
     return {
@@ -67,7 +84,7 @@ export function calculatePortfolioSummary(
 
 
 export function calculateAssetAllocation(
-  holdings: PortfolioHolding[]
+  holdings: PortfolioHoldingPlain[]
 ): AssetAllocation[] {
   const totalValue = holdings.reduce(
     (sum, h) => sum + (h.marketValue || 0),

@@ -7,11 +7,13 @@ type LogoWordmarkProps = {
 };
 
 export const LogoWordmark = ({ className }: LogoWordmarkProps) => {
+  const textColor = className?.includes("text-gray-900") ? "text-gray-900" : "text-white";
+  
   return (
     <span
       className={cn("inline-flex flex-col relative leading-none", className)}
     >
-      <span className="text-2xl font-semibold text-white tracking-tight">
+      <span className={cn("text-2xl font-semibold tracking-tight", textColor)}>
         Stock tracker
       </span>
       <svg

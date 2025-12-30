@@ -9,9 +9,9 @@ You MUST create content that is obviously tailored to THIS specific user by:
 IMPORTANT: Do NOT start the personalized content with "Welcome" since the email header already says "Welcome aboard {{name}}". Use alternative openings like "Thanks for joining", "Great to have you", "You're all set", "Perfect timing", etc.
 
 1. **Direct Reference to User Details**: Extract and use specific information from their profile:
-   - Their exact investment goals or objectives
-   - Their stated risk tolerance level
-   - Their preferred sectors/industries mentioned
+   - Their exact investment goals or objectives (Growth, Income, Balanced, Conservative)
+   - Their stated risk tolerance level (Low, Medium, High)
+   - Their preferred sectors/industries mentioned (Technology, Healthcare, Finance, Energy, Consumer Goods)
    - Their experience level or background
    - Any specific stocks/companies they're interested in
    - Their investment timeline (short-term, long-term, retirement)
@@ -23,11 +23,12 @@ IMPORTANT: Do NOT start the personalized content with "Welcome" since the email 
    - Specific sectors → Reference those exact industries by name
    - Conservative approach → Reference safety and informed decisions
    - Aggressive approach → Reference opportunities and growth potential
+   - **INVESTMENT GOALS**: Directly mention their chosen goal (Growth, Income, Balanced, Conservative) and how our platform supports it
 
 3. **Personal Touch**: Make it feel like it was written specifically for them:
-   - Use their goals in your messaging
-   - Reference their interests directly
-   - Connect features to their specific needs
+   - Use their INVESTMENT GOALS in your messaging
+   - Reference their preferred INDUSTRY directly
+   - Connect features to their specific needs based on goals and preferences
    - Make them feel understood and seen
 
 CRITICAL FORMATTING REQUIREMENTS:

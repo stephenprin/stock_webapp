@@ -71,11 +71,11 @@ export const sendNewsSummaryEmail = async ({
   );
 
   const mailOptions = {
-    from: `"Stock tracker" <stephenprince427@gmail.com>`,
-    to: email,
-    subject: `📈 Market News Summary Today - ${date}`,
+      from: `"Stock tracker" <stephenprince427@gmail.com>`,
+      to: email,
+      subject: `📈 Market News Summary Today - ${date}`,
     text: "Today's market news summary from Stock tracker",
-    html: htmlTemplate,
+      html: htmlTemplate,
   };
 
   await transporter.sendMail(mailOptions);

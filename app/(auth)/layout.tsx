@@ -1,7 +1,5 @@
-import Header from "@/components/Header";
 import { LogoWordmark } from "@/components/LogoWordmark";
 import Link from "next/link";
-import Image from "next/image";
 import React from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -10,57 +8,32 @@ import { auth } from "@/lib/better-auth/auth";
 async function Layout({ children }: { children: React.ReactNode }) {  
   const session = await auth.api.getSession({ headers: await headers() });
   if (session?.user) {
-    redirect("/");
+    redirect("/dashboard");
   }
 
   return (
-    <main className="auth-layout">
-      <section className="auth-left-section scrollbar-hide-default">
-        <Link href="/" className="auth-logo inline-block">
-          <LogoWordmark />
-        </Link>
+    <main className="min-h-screen bg-gray-900">
+      <div className="min-h-screen flex flex-col">
+        {/* Header */}
+        <header className="flex items-center justify-between px-6 py-4 sm:px-8 sm:py-6">
+          <Link href="/" className="inline-block">
+            <LogoWordmark />
+          </Link>
+          <Link 
+            href="/support" 
+            className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            Support
+          </Link>
+        </header>
 
-        <div className="pb-6 lg:pb-8 flex-1 flex items-center justify-center">
-          {children}
-        </div>
-      </section>
-
-      <section className="auth-right-section">
-        <div className="z-10 relative lg:mt-4 lg:mb-16">
-          <blockquote className="auth-blockquote">
-            Signalist turned my watchlist into a winning list. The alerts are
-            spot-on, and I feel more confident making moves in the market
-          </blockquote>
-          <div className="flex items-center justify-between">
-            <div>
-              <cite className="auth-testimonial-author">- Ethan R.</cite>
-              <p className="max-md:text-xs text-gray-500">Retail Investor</p>
-            </div>
-            <div className="flex items-center gap-0.5">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Image
-                  src="/assets/icons/star.svg"
-                  alt="Star"
-                  key={star}
-                  width={20}
-                  height={20}
-                  className="w-5 h-5"
-                />
-              ))}
-            </div>
+        {/* Main Content */}
+        <div className="flex-1 flex items-center justify-center px-4 py-8">
+          <div className="w-full max-w-md">
+            {children}
           </div>
         </div>
-
-        <div className="flex-1 relative">
-          <Image
-            src="/assets/images/dashboard.png"
-            alt="Dashboard Preview"
-            width={1440}
-            height={1150}
-            className="auth-dashboard-preview absolute top-0"
-          />
-        </div>
-      </section>
+      </div>
     </main>
   );
 }

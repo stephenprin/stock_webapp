@@ -254,3 +254,59 @@ export async function getStockQuotesBatch(
 
   return quotes;
 }
+
+/**
+ * Get company profile information
+ */
+export async function getCompanyProfile(symbol: string): Promise<{
+  name?: string;
+  ticker?: string;
+  exchange?: string;
+  currency?: string;
+  country?: string;
+  industry?: string;
+  sector?: string;
+  website?: string;
+  description?: string;
+  marketCapitalization?: number;
+  logo?: string;
+  phone?: string;
+  finnhubIndustry?: string;
+} | null> {
+  try {
+    const token = process.env.FINNHUB_API_KEY ?? NEXT_PUBLIC_FINNHUB_API_KEY;
+    if (!token) {
+      console.error('FINNHUB API key is not configured');
+      return null;
+    }
+
+    const cleanSymbol = symbol.trim().toUpperCase();
+    const url = `${FINNHUB_BASE_URL}/stock/profile2?symbol=${encodeURIComponent(cleanSymbol)}&token=${token}`;
+    
+    // Cache for 1 hour (company data doesn't change frequently)
+    const data = await fetchJSON<any>(url, 3600);
+
+    if (!data || Object.keys(data).length === 0) {
+      return null;
+    }
+
+    return {
+      name: data.name,
+      ticker: data.ticker,
+      exchange: data.exchange,
+      currency: data.currency,
+      country: data.country,
+      industry: data.finnhubIndustry || data.industry,
+      sector: data.sector,
+      website: data.weburl,
+      description: data.description,
+      marketCapitalization: data.marketCapitalization,
+      logo: data.logo,
+      phone: data.phone,
+      finnhubIndustry: data.finnhubIndustry,
+    };
+  } catch (err) {
+    console.error('Error fetching company profile for', symbol, err);
+    return null;
+  }
+}
