@@ -1,5 +1,10 @@
 import nodemailer from "nodemailer";
-import { NEWS_SUMMARY_EMAIL_TEMPLATE, WELCOME_EMAIL_TEMPLATE } from "./templates";
+import {
+  NEWS_SUMMARY_EMAIL_TEMPLATE,
+  WELCOME_EMAIL_TEMPLATE,
+  STOCK_ALERT_UPPER_EMAIL_TEMPLATE,
+  STOCK_ALERT_LOWER_EMAIL_TEMPLATE,
+} from "./templates";
 import { OTP_EMAIL_TEMPLATE } from "./otp-email";
 
 export const transporter = nodemailer.createTransport({
@@ -76,6 +81,61 @@ export const sendNewsSummaryEmail = async ({
       subject: `📈 Market News Summary Today - ${date}`,
     text: "Today's market news summary from Stock tracker",
       html: htmlTemplate,
+  };
+
+  await transporter.sendMail(mailOptions);
+};
+
+export const sendPriceAlertEmail = async ({
+  email,
+  name,
+  symbol,
+  company,
+  currentPrice,
+  targetPrice,
+  alertType,
+}: {
+  email: string;
+  name: string;
+  symbol: string;
+  company: string;
+  currentPrice: number;
+  targetPrice: number;
+  alertType: "upper" | "lower";
+}) => {
+  const template =
+    alertType === "upper"
+      ? STOCK_ALERT_UPPER_EMAIL_TEMPLATE
+      : STOCK_ALERT_LOWER_EMAIL_TEMPLATE;
+
+  // Format the timestamp
+  const timestamp = new Date().toLocaleString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+
+  const formattedCurrentPrice = `$${currentPrice.toFixed(2)}`;
+  const formattedTargetPrice = `$${targetPrice.toFixed(2)}`;
+
+
+  let htmlTemplate = template
+    .replace(/\{\{symbol\}\}/g, symbol.toUpperCase())
+    .replace(/\{\{company\}\}/g, company)
+    .replace(/\{\{currentPrice\}\}/g, formattedCurrentPrice)
+    .replace(/\{\{targetPrice\}\}/g, formattedTargetPrice)
+    .replace(/\{\{timestamp\}\}/g, timestamp);
+
+  const mailOptions = {
+    from: `"Stock tracker" <stephenprince427@gmail.com>`,
+    to: email,
+    subject: `📈 Price Alert: ${symbol.toUpperCase()} ${alertType === "upper" ? "Above" : "Below"} ${formattedTargetPrice}`,
+    text: `Price Alert: ${symbol.toUpperCase()} is now ${formattedCurrentPrice}, which is ${alertType === "upper" ? "above" : "below"} your ${alertType === "upper" ? "upper" : "lower"} threshold of ${formattedTargetPrice}.`,
+    html: htmlTemplate,
   };
 
   await transporter.sendMail(mailOptions);

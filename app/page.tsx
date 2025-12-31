@@ -245,7 +245,7 @@ export default function HomePage() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="text-6xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-8 leading-[1.1] text-foreground"
             >
-              Track Your Stocks
+             Track Your Stock
               <br />
               <motion.span
                 initial={{ opacity: 0 }}
@@ -253,7 +253,7 @@ export default function HomePage() {
                 transition={{ duration: 0.6, delay: 0.3 }}
                 className="text-primary"
               >
-                Like a Pro
+                Like Big Man
               </motion.span>
             </motion.h1>
 

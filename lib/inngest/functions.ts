@@ -1,13 +1,15 @@
-import { getNews } from "../actions/finnhub.actions";
+import { getNews, getStockQuote } from "../actions/finnhub.actions";
 import { getAllUsersForNewsEmail } from "../actions/user.actions";
 import { getWatchlistSymbolsByEmail } from "../actions/watchlist.actiond";
-import { sendNewsSummaryEmail, sendWelcomeEmail } from "../nodemailer";
+import { sendNewsSummaryEmail, sendWelcomeEmail, sendPriceAlertEmail } from "../nodemailer";
 import { getFormattedTodayDate } from "../utils/utils";
 import { inngest } from "./client";
 import {
   NEWS_SUMMARY_EMAIL_PROMPT,
   PERSONALIZED_WELCOME_EMAIL_PROMPT,
 } from "./prompts";
+import { connectToDatabase } from "@/database/mongoose";
+import { PriceAlertModel } from "@/database/models/price-alert.model";
 
 export const sendSignUpEmail = inngest.createFunction(
   { id: "sign-up-email" },
@@ -143,6 +145,184 @@ export const sendDailyNewsSummary = inngest.createFunction(
     return {
       success: true,
       message: "Daily news summary emails sent successfully",
+    };
+  }
+);
+
+export const checkPriceAlerts = inngest.createFunction(
+  { id: "check-price-alerts" },
+  [{ cron: "*/5 * * * *" }], 
+  async ({ step }) => {
+    // Step 1: Fetch all active alerts from database
+    const activeAlerts = await step.run("fetch-active-alerts", async () => {
+      await connectToDatabase();
+      const alerts = await PriceAlertModel.find({ isActive: true }).lean();
+      
+      return alerts.map((alert) => ({
+        _id: (alert._id as any)?.toString(),
+        userId: alert.userId,
+        symbol: alert.symbol,
+        company: alert.company,
+        alertName: alert.alertName,
+        alertType: alert.alertType,
+        threshold: alert.threshold,
+        triggeredAt: alert.triggeredAt,
+      }));
+    });
+
+    if (!activeAlerts || activeAlerts.length === 0) {
+      return {
+        success: true,
+        message: "No active alerts to check",
+        checked: 0,
+        triggered: 0,
+      };
+    }
+
+    const uniqueSymbols = [...new Set(activeAlerts.map((alert) => alert.symbol))];
+    const priceMap = new Map<string, number>();
+
+    await step.run("fetch-stock-prices", async () => {
+      const priceResults = await Promise.allSettled(
+        uniqueSymbols.map(async (symbol) => {
+          try {
+            const quote = await getStockQuote(symbol);
+            return { symbol, price: quote?.currentPrice || null };
+          } catch (error) {
+            console.error(`Error fetching price for ${symbol}:`, error);
+            return { symbol, price: null };
+          }
+        })
+      );
+
+      priceResults.forEach((result) => {
+        if (result.status === "fulfilled" && result.value.price !== null) {
+          priceMap.set(result.value.symbol, result.value.price);
+        }
+      });
+    });
+
+    const triggeredAlerts: Array<{
+      alert: typeof activeAlerts[0];
+      currentPrice: number;
+    }> = [];
+
+    for (const alert of activeAlerts) {
+      const currentPrice = priceMap.get(alert.symbol);
+      
+      if (!currentPrice) {
+        continue;
+      }
+
+      const shouldTrigger =
+        alert.alertType === "upper"
+          ? currentPrice >= alert.threshold
+          : currentPrice <= alert.threshold;
+
+      if (shouldTrigger && !alert.triggeredAt) {
+        triggeredAlerts.push({ alert, currentPrice });
+      }
+    }
+
+    if (triggeredAlerts.length === 0) {
+      return {
+        success: true,
+        message: "No alerts triggered",
+        checked: activeAlerts.length,
+        triggered: 0,
+      };
+    }
+
+    type AlertWithUserInfo = {
+      alert: {
+        _id: string;
+        userId: string;
+        symbol: string;
+        company: string;
+        alertName: string;
+        alertType: "upper" | "lower";
+        threshold: number;
+        triggeredAt?: Date | string;
+      };
+      currentPrice: number;
+      email: string;
+      name: string;
+    };
+
+    const alertsWithUserInfo = await step.run("fetch-user-info", async (): Promise<AlertWithUserInfo[]> => {
+      const uniqueUserIds = [...new Set(triggeredAlerts.map((t) => t.alert.userId))];
+      const mongoose = await connectToDatabase();
+      const db = mongoose.connection.db;
+      
+      if (!db) {
+        throw new Error("MongoDB connection not found");
+      }
+
+      const userCollection = db.collection("user");
+      const result: AlertWithUserInfo[] = [];
+
+      for (const userId of uniqueUserIds) {
+        try {
+          const user = await userCollection.findOne<{ id: string; email: string; name: string }>(
+            { id: userId },
+            { projection: { _id: 1, id: 1, email: 1, name: 1 } }
+          );
+
+          if (user && user.email && user.name) {
+            const alertsForUser = triggeredAlerts.filter(
+              (t) => t.alert.userId === userId
+            );
+            alertsForUser.forEach(({ alert, currentPrice }) => {
+              result.push({
+                alert,
+                currentPrice,
+                email: user.email,
+                name: user.name,
+              });
+            });
+          }
+        } catch (error) {
+          console.error(`Error fetching user info for ${userId}:`, error);
+        }
+      }
+
+      return result;
+    });
+
+    await step.run("send-alert-emails", async () => {
+      await Promise.allSettled(
+        alertsWithUserInfo.map(async ({ alert, currentPrice, email, name }) => {
+          try {
+          
+            await sendPriceAlertEmail({
+              email,
+              name,
+              symbol: alert.symbol,
+              company: alert.company,
+              currentPrice,
+              targetPrice: alert.threshold,
+              alertType: alert.alertType,
+            });
+
+            await PriceAlertModel.updateOne(
+              { _id: alert._id },
+              { $set: { triggeredAt: new Date() } }
+            );
+          } catch (error) {
+            console.error(
+              `Error sending alert email for ${alert.symbol} to ${email}:`,
+              error
+            );
+          }
+        })
+      );
+    });
+
+    return {
+      success: true,
+      message: "Price alerts checked and emails sent",
+      checked: activeAlerts.length,
+      triggered: alertsWithUserInfo.length,
     };
   }
 );

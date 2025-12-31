@@ -40,6 +40,7 @@ export async function getSubscriptionLimits(plan: SubscriptionPlan): Promise<Sub
     case "free":
       return {
         maxStocks: 10,
+        maxAlerts: 5,
         alerts: "basic",
         newsPriority: "standard",
         analytics: false,
@@ -51,7 +52,8 @@ export async function getSubscriptionLimits(plan: SubscriptionPlan): Promise<Sub
     
     case "pro":
       return {
-        maxStocks: null, 
+        maxStocks: null,
+        maxAlerts: null,
         alerts: "advanced",
         newsPriority: "priority",
         analytics: true,
@@ -63,7 +65,8 @@ export async function getSubscriptionLimits(plan: SubscriptionPlan): Promise<Sub
     
     case "enterprise":
       return {
-        maxStocks: null, 
+        maxStocks: null,
+        maxAlerts: null,
         alerts: "custom",
         newsPriority: "premium",
         analytics: true,
@@ -150,6 +153,53 @@ export async function enforceStockLimit(
     return {
       allowed: true,
       currentCount: currentStockCount,
+      limit: null,
+    };
+  }
+}
+
+
+export async function enforceAlertLimit(
+  currentAlertCount: number
+): Promise<{
+  allowed: boolean;
+  reason?: string;
+  upgradeRequired?: boolean;
+  currentCount: number;
+  limit: number | null;
+}> {
+  try {
+    const subscription = await checkSubscriptionStatus();
+    const limits = await getSubscriptionLimits(subscription.plan);
+    
+    if (limits.maxAlerts === null) {
+      return {
+        allowed: true,
+        currentCount: currentAlertCount,
+        limit: null,
+      };
+    }
+    
+    if (currentAlertCount >= limits.maxAlerts) {
+      return {
+        allowed: false,
+        reason: `You've reached the limit of ${limits.maxAlerts} alerts for your ${subscription.plan} plan. Upgrade to Pro for unlimited alerts.`,
+        upgradeRequired: true,
+        currentCount: currentAlertCount,
+        limit: limits.maxAlerts,
+      };
+    }
+    
+    return {
+      allowed: true,
+      currentCount: currentAlertCount,
+      limit: limits.maxAlerts,
+    };
+  } catch (error) {
+    console.error("Error enforcing alert limit:", error);
+    return {
+      allowed: true,
+      currentCount: currentAlertCount,
       limit: null,
     };
   }

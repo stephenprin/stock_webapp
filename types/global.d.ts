@@ -291,7 +291,8 @@ declare global {
     type SubscriptionPlan = "free" | "pro" | "enterprise";
 
     type SubscriptionLimits = {
-        maxStocks: number | null; // null = unlimited
+        maxStocks: number | null;
+        maxAlerts: number | null; 
         alerts: "basic" | "advanced" | "custom";
         newsPriority: "standard" | "priority" | "premium";
         analytics: boolean;

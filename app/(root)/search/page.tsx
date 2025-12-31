@@ -9,9 +9,10 @@ import TradingViewWidget from "@/components/TradingViewWidget";
 import { CANDLE_CHART_WIDGET_CONFIG, SYMBOL_INFO_WIDGET_CONFIG } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, TrendingUp, TrendingDown, ExternalLink, Plus, Building2, Globe, BarChart3 } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, ExternalLink, Plus, Building2, Globe, BarChart3, Bell } from "lucide-react";
 import { toast } from "sonner";
 import AddPositionDialog from "@/components/portfolio/AddPositionDialog";
+import CreateAlertDialog from "@/components/alerts/CreateAlertDialog";
 import { formatCurrency, formatPercent } from "@/lib/utils/utils";
 
 export default function SearchPage() {
@@ -25,6 +26,7 @@ export default function SearchPage() {
   const [news, setNews] = useState<MarketNewsArticle[]>([]);
   const [inPortfolio, setInPortfolio] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [createAlertDialogOpen, setCreateAlertDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!symbol) {
@@ -163,6 +165,14 @@ export default function SearchPage() {
                 View in Portfolio
               </Button>
             )}
+            <Button
+              onClick={() => setCreateAlertDialogOpen(true)}
+              variant="outline"
+              className="border-green-500 text-green-500 hover:bg-green-500/10"
+            >
+              <Bell className="h-4 w-4 mr-2" />
+              Create Alert
+            </Button>
           </div>
         </div>
 
@@ -372,6 +382,17 @@ export default function SearchPage() {
         }}
         defaultSymbol={symbol}
         defaultCompanyName={profile?.name || ""}
+      />
+
+      <CreateAlertDialog
+        open={createAlertDialogOpen}
+        onOpenChange={setCreateAlertDialogOpen}
+        onAlertCreated={() => {
+          setCreateAlertDialogOpen(false);
+          toast.success("Price alert created successfully");
+        }}
+        defaultSymbol={symbol}
+        defaultCompany={profile?.name || ""}
       />
     </div>
   );
