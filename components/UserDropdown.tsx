@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import { Button } from "./ui/button";
 import { useRouter } from "next/navigation";
-import { LogOut, Settings } from "lucide-react";
+import { LogOut, Settings, HelpCircle } from "lucide-react";
 import NavItems from "./NavItems";
 import { signOut } from "@/lib/actions/auth.actions";
 
@@ -68,6 +68,13 @@ function UserDropdown({ user }: { user: User }) {
         >
           <Settings className="h-4 w-4 mr-2 hidden sm:block" />
           Settings
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => router.push("/support")}
+          className="text-gray-100 text-md font-medium focus:bg-transparent focus:text-yellow-500 transition-colors cursor-pointer"
+        >
+          <HelpCircle className="h-4 w-4 mr-2 hidden sm:block" />
+          Support
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={handleSignOut}

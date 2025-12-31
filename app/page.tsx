@@ -103,7 +103,7 @@ const pricingPlans = [
     revenueLimit: "Free forever",
     description: "Perfect for getting started",
     features: [
-      "Track up to 10 stocks",
+      "Track up to 5 stocks",
       "Basic price alerts",
       "Daily news summaries",
       "Real-time market data",
@@ -134,7 +134,7 @@ const pricingPlans = [
   },
   {
     name: "Enterprise",
-    price: 29,
+    price: 20,
     priceDisplay: "$29",
     revenueLimit: "per month",
     description: "For professional traders",
@@ -694,6 +694,12 @@ export default function HomePage() {
                 className="hover:text-foreground transition-colors"
               >
                 Sign In
+              </Link>
+              <Link
+                href="/support"
+                className="hover:text-foreground transition-colors"
+              >
+                Support
               </Link>
             </div>
             <p className="text-sm text-muted-foreground">

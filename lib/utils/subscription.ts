@@ -39,7 +39,7 @@ export async function getSubscriptionLimits(plan: SubscriptionPlan): Promise<Sub
   switch (plan) {
     case "free":
       return {
-        maxStocks: 10,
+        maxStocks: 5,
         maxAlerts: 5,
         alerts: "basic",
         newsPriority: "standard",
