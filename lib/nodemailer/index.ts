@@ -108,7 +108,6 @@ export const sendPriceAlertEmail = async ({
       ? STOCK_ALERT_UPPER_EMAIL_TEMPLATE
       : STOCK_ALERT_LOWER_EMAIL_TEMPLATE;
 
-  // Format the timestamp
   const timestamp = new Date().toLocaleString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -138,5 +137,16 @@ export const sendPriceAlertEmail = async ({
     html: htmlTemplate,
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`[Email] Price alert email sent successfully to ${email}`, {
+      messageId: info.messageId,
+      accepted: info.accepted,
+      rejected: info.rejected,
+    });
+    return info;
+  } catch (error) {
+    console.error(`[Email] Failed to send price alert email to ${email}:`, error);
+    throw error;
+  }
 };

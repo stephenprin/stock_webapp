@@ -19,8 +19,10 @@ import { useSubscription } from "@/lib/hooks/useSubscription";
 import { PLAN_FEATURES } from "@/lib/constants";
 import SubscriptionBadge from "@/components/billing/SubscriptionBadge";
 import UpgradeDialog from "@/components/billing/UpgradeDialog";
+import PushNotificationButton from "@/components/notifications/PushNotificationButton";
 import { toast } from "sonner";
 import { formatCurrency, formatPercent } from "@/lib/utils/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function SettingsPage() {
   const { plan, customer, isFree, isPro, isEnterprise, openBillingPortal, loading } = useSubscription();
@@ -62,7 +64,6 @@ export default function SettingsPage() {
     setUpgradeDialogOpen(true);
   };
 
-  // Get active product subscription details
   const activeProduct = customer?.products?.find(
     p => (p.status === "active" || p.status === "trialing") && 
     (p.id === "pro_plan" || p.id === "enterprise_plan")
@@ -100,104 +101,145 @@ export default function SettingsPage() {
                 Manage your subscription plan and billing information
               </CardDescription>
             </div>
-            <SubscriptionBadge />
+            {loading ? <Skeleton className="h-6 w-20" /> : <SubscriptionBadge />}
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Current Plan */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-300 mb-3">Current Plan</h3>
-            <div className="rounded-lg bg-gray-700/50 p-4 border border-gray-600">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-lg font-semibold text-white">
-                      {planInfo?.name || "Free"}
-                    </span>
-                    {activeProduct?.status === "trialing" && (
-                      <Badge variant="outline" className="border-yellow-500 text-yellow-500">
-                        Trial
-                      </Badge>
-                    )}
-                    {activeProduct?.status === "active" && (
-                      <Badge variant="outline" className="border-green-500 text-green-500">
-                        Active
-                      </Badge>
-                    )}
+          {loading ? (
+            <div>
+              <Skeleton className="h-5 w-24 mb-3" />
+              <div className="rounded-lg bg-gray-700/50 p-4 border border-gray-600">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Skeleton className="h-6 w-20" />
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                    </div>
+                    <Skeleton className="h-4 w-32" />
                   </div>
-                  {planInfo && (
-                    <p className="text-sm text-gray-400">
-                      {planInfo.price} {planInfo.period}
-                    </p>
-                  )}
-                  {!planInfo && (
-                    <p className="text-sm text-gray-400">No active subscription</p>
-                  )}
+                  <Skeleton className="h-10 w-40" />
                 </div>
-                {nextPlan && (
-                  <Button
-                    onClick={() => handleUpgradeClick(nextPlan)}
-                    className="bg-yellow-500 hover:bg-yellow-600 text-gray-900"
-                  >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    {isPro ? "Switch to Enterprise" : "Upgrade to Pro"}
-                  </Button>
-                )}
               </div>
             </div>
-          </div>
-
-          {/* Subscription Details */}
-          {activeProduct && (
+          ) : (
             <div>
-              <h3 className="text-sm font-semibold text-gray-300 mb-3">Subscription Details</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between text-gray-400">
-                  <span>Status:</span>
-                  <span className={activeProduct.status === "active" ? "text-green-500" : "text-yellow-500"}>
-                    {activeProduct.status === "active" ? "Active" : "Trial"}
-                  </span>
-                </div>
-                {activeProduct.next_cycle_at && (
-                  <div className="flex justify-between text-gray-400">
-                    <span>Next billing date:</span>
-                    <span className="text-white">{formatDate(activeProduct.next_cycle_at)}</span>
+              <h3 className="text-sm font-semibold text-gray-300 mb-3">Current Plan</h3>
+              <div className="rounded-lg bg-gray-700/50 p-4 border border-gray-600">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg font-semibold text-white">
+                        {planInfo?.name || "Free"}
+                      </span>
+                      {activeProduct?.status === "trialing" && (
+                        <Badge variant="outline" className="border-yellow-500 text-yellow-500">
+                          Trial
+                        </Badge>
+                      )}
+                      {activeProduct?.status === "active" && (
+                        <Badge variant="outline" className="border-green-500 text-green-500">
+                          Active
+                        </Badge>
+                      )}
+                    </div>
+                    {planInfo && (
+                      <p className="text-sm text-gray-400">
+                        {planInfo.price} {planInfo.period}
+                      </p>
+                    )}
+                    {!planInfo && (
+                      <p className="text-sm text-gray-400">No active subscription</p>
+                    )}
                   </div>
-                )}
+                  {nextPlan && (
+                    <Button
+                      onClick={() => handleUpgradeClick(nextPlan)}
+                      className="bg-yellow-500 hover:bg-yellow-600 text-gray-900"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      {isPro ? "Switch to Enterprise" : "Upgrade to Pro"}
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
+          {/* Subscription Details */}
+          {loading ? (
+            <div>
+              <Skeleton className="h-5 w-36 mb-3" />
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+                <div className="flex justify-between">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+              </div>
+            </div>
+          ) : (
+            activeProduct && (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-300 mb-3">Subscription Details</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between text-gray-400">
+                    <span>Status:</span>
+                    <span className={activeProduct.status === "active" ? "text-green-500" : "text-yellow-500"}>
+                      {activeProduct.status === "active" ? "Active" : "Trial"}
+                    </span>
+                  </div>
+                  {'next_cycle_at' in activeProduct && (activeProduct as any).next_cycle_at && (
+                    <div className="flex justify-between text-gray-400">
+                      <span>Next billing date:</span>
+                      <span className="text-white">{formatDate((activeProduct as any).next_cycle_at as number)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          )}
+
           {/* Billing Management */}
           <div className="border-t border-gray-700 pt-6" />
-          <div>
-            <h3 className="text-sm font-semibold text-gray-300 mb-3">Billing Management</h3>
-            <p className="text-sm text-gray-400 mb-4">
-              Update your payment method, view invoices, and manage your subscription through Stripe's secure billing portal.
-            </p>
-            <Button
-              onClick={handleOpenBillingPortal}
-              disabled={openingPortal || loading || isFree}
-              variant="outline"
-              className="w-full sm:w-auto"
-            >
-              {openingPortal ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Opening...
-                </>
-              ) : (
-                <>
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  {isFree ? "Billing Portal (Requires Active Subscription)" : "Open Billing Portal"}
-                </>
-              )}
-            </Button>
-          </div>
+          {loading ? (
+            <div>
+              <Skeleton className="h-5 w-40 mb-3" />
+              <Skeleton className="h-4 w-full mb-4" />
+              <Skeleton className="h-10 w-48" />
+            </div>
+          ) : (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-300 mb-3">Billing Management</h3>
+              <p className="text-sm text-gray-400 mb-4">
+                Update your payment method, view invoices, and manage your subscription through Stripe's secure billing portal.
+              </p>
+              <Button
+                onClick={handleOpenBillingPortal}
+                disabled={openingPortal || loading || isFree}
+                variant="outline"
+                className="w-full sm:w-auto"
+              >
+                {openingPortal ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Opening...
+                  </>
+                ) : (
+                  <>
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    {isFree ? "Billing Portal (Requires Active Subscription)" : "Open Billing Portal"}
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Plan Features Comparison */}
       <Card className="bg-gray-800 border-gray-700 mb-6">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
@@ -254,7 +296,6 @@ export default function SettingsPage() {
               )}
             </div>
 
-            {/* Pro Plan */}
             <div className={`rounded-lg border-2 p-4 ${
               plan === "pro" 
                 ? "border-yellow-500 bg-yellow-500/10" 
@@ -324,6 +365,22 @@ export default function SettingsPage() {
               )}
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Push Notifications Section */}
+      <Card className="bg-gray-800 border-gray-700 mb-6">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Notifications
+          </CardTitle>
+          <CardDescription className="text-gray-400">
+            Manage your notification preferences
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PushNotificationButton />
         </CardContent>
       </Card>
 

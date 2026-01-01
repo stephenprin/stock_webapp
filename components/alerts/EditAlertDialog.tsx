@@ -56,7 +56,6 @@ export default function EditAlertDialog({
   const threshold = watch("threshold");
   const alertType = alert.alertType;
 
-  // Fetch current price when dialog opens
   useEffect(() => {
     if (open && alert.symbol) {
       setFetchingPrice(true);
@@ -67,7 +66,7 @@ export default function EditAlertDialog({
           }
         })
         .catch((error) => {
-          console.error("Error fetching price:", error);
+          // Error fetching price - silently fail
         })
         .finally(() => {
           setFetchingPrice(false);
@@ -106,7 +105,6 @@ export default function EditAlertDialog({
         toast.error(result.error || "Failed to update alert");
       }
     } catch (error) {
-      console.error("Error updating alert:", error);
       toast.error("Failed to update alert");
     } finally {
       setLoading(false);

@@ -70,7 +70,6 @@ export function useSubscription() {
       const defaultSuccessUrl = `${baseUrl}/portfolio?upgraded=true`;
       const defaultCancelUrl = `${baseUrl}/portfolio`;
       
-      // Build checkout session params with cancel URL
       const checkoutSessionParams: Record<string, any> = {};
       if (options.cancelUrl || defaultCancelUrl) {
         checkoutSessionParams.cancel_url = options.cancelUrl || defaultCancelUrl;

@@ -76,7 +76,6 @@ export async function createPriceAlert(
       };
     }
 
-    // Create the alert
     const alert = await PriceAlertModel.create({
       userId,
       symbol: data.symbol.toUpperCase(),
@@ -95,8 +94,6 @@ export async function createPriceAlert(
       } as PriceAlertPlain,
     };
   } catch (error: any) {
-    console.error("Error creating price alert:", error);
-
     if (error.code === 11000) {
       return {
         success: false,
@@ -164,7 +161,6 @@ export async function getUserAlerts(): Promise<{
           }
         });
       } catch (error) {
-        console.error("Error fetching prices for alerts:", error);
       }
     }
 
@@ -179,7 +175,6 @@ export async function getUserAlerts(): Promise<{
       alerts: alertsWithPrices,
     };
   } catch (error: any) {
-    console.error("Error fetching user alerts:", error);
     return {
       success: false,
       error: error.message || "Failed to fetch alerts",
@@ -248,7 +243,6 @@ export async function updatePriceAlert(
       } as PriceAlertPlain,
     };
   } catch (error: any) {
-    console.error("Error updating price alert:", error);
     return {
       success: false,
       error: error.message || "Failed to update alert",
@@ -292,7 +286,6 @@ export async function deletePriceAlert(
       success: true,
     };
   } catch (error: any) {
-    console.error("Error deleting price alert:", error);
     return {
       success: false,
       error: error.message || "Failed to delete alert",
@@ -320,7 +313,6 @@ export async function toggleAlertStatus(
     await connectToDatabase();
     const userId = session.user.id;
 
-    // Find the alert and verify ownership
     const alert = await PriceAlertModel.findOne({
       _id: alertId,
       userId,
@@ -344,7 +336,6 @@ export async function toggleAlertStatus(
       } as PriceAlertPlain,
     };
   } catch (error: any) {
-    console.error("Error toggling alert status:", error);
     return {
       success: false,
       error: error.message || "Failed to toggle alert status",

@@ -3,10 +3,7 @@
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 
-/**
- * Check user's current subscription status from Autumn
- * Returns the plan and customer information
- */
+
 export async function checkSubscriptionStatus(): Promise<{
   plan: SubscriptionPlan;
   customerId?: string;
@@ -27,7 +24,6 @@ export async function checkSubscriptionStatus(): Promise<{
     };
   } catch (error) {
     console.error("Error checking subscription status:", error);
-    // Default to free on error
     return { plan: "free" };
   }
 }
@@ -97,7 +93,6 @@ export async function canAccessFeature(
       return feature;
     }
     
-    // For other features, we can add more complex logic later
     return true;
   } catch (error) {
     console.error("Error checking feature access:", error);
@@ -105,10 +100,7 @@ export async function canAccessFeature(
   }
 }
 
-/**
- * Enforce stock limit based on user's subscription
- * Returns whether the user can add more stocks
- */
+
 export async function enforceStockLimit(
   userId: string,
   currentStockCount: number
@@ -123,7 +115,6 @@ export async function enforceStockLimit(
     const subscription = await checkSubscriptionStatus();
     const limits = await getSubscriptionLimits(subscription.plan);
     
-    // If unlimited (null), always allow
     if (limits.maxStocks === null) {
       return {
         allowed: true,
@@ -132,7 +123,6 @@ export async function enforceStockLimit(
       };
     }
     
-    // Check if user has reached the limit
     if (currentStockCount >= limits.maxStocks) {
       return {
         allowed: false,

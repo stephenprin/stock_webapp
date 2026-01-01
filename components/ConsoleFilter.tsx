@@ -20,12 +20,19 @@ export function ConsoleFilter() {
       ) {
         return;
       }
+      // Suppress Node.js url.parse() deprecation warning from web-push dependency
+      if (
+        message.includes("DEP0169") ||
+        (message.includes("url.parse()") && message.includes("deprecation"))
+      ) {
+        return;
+      }
       originalWarn.apply(console, args);
     };
 
     console.error = (...args: unknown[]) => {
       const message = String(args[0] || "");
-      // Suppress TradingView Snowplow environment warnings
+     
       if (
         message.includes("Invalid environment") &&
         message.includes("snowplow")
