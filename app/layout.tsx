@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ConsoleFilter } from "@/components/ConsoleFilter";
-import { AutumnProvider } from "autumn-js/react";
+import AutumnProviderWrapper from "@/components/providers/AutumnProviderWrapper";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Signal AI",
+  title: "Stock tracker",
   description:
     "Track real time stock prices, news and get personalized company insights",
   icons: {
@@ -35,14 +36,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AutumnProvider 
-          betterAuthUrl={process.env.NEXT_PUBLIC_BETTER_AUTH_URL}
-          backendUrl={typeof window !== 'undefined' ? window.location.origin : undefined}
-      >
-        <ConsoleFilter />
-        {children}
-        <Toaster />
-        </AutumnProvider>
+        <AutumnProviderWrapper>
+          <ConsoleFilter />
+          <ServiceWorkerRegister />
+          {children}
+          <Toaster />
+        </AutumnProviderWrapper>
       </body>
     </html>
   );

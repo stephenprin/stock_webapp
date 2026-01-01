@@ -207,7 +207,6 @@ export default function HomePage() {
   }, []);
 
   const handleGetStarted = () => {
-    // Navigate to dashboard - (root) layout will redirect to sign-in if not authenticated
     router.push("/dashboard");
   };
 

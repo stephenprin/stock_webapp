@@ -37,7 +37,8 @@
     "react-select-country-list": "^2.2.3",
     "recharts": "^3.6.0",
     "sonner": "^2.0.7",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.4.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -46,6 +47,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-select-country-list": "^2.2.3",
+    "@types/web-push": "^3.6.4",
     "baseline-browser-mapping": "^2.9.11",
     "dotenv": "^17.2.3",
     "eslint": "^9",

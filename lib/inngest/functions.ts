@@ -10,6 +10,8 @@ import {
 } from "./prompts";
 import { connectToDatabase } from "@/database/mongoose";
 import { PriceAlertModel } from "@/database/models/price-alert.model";
+import { getPushSubscriptionsByUserId } from "@/lib/actions/push.actions";
+import { sendPushNotifications } from "@/lib/services/push-notification.service";
 
 export const sendSignUpEmail = inngest.createFunction(
   { id: "sign-up-email" },
@@ -63,71 +65,66 @@ export const sendDailyNewsSummary = inngest.createFunction(
   [{ event: "app/user.daily-news-summary" }, { cron: "0 12 * * *" }],
   async ({ event, step }) => {
     const users = await step.run("get-all-users", getAllUsersForNewsEmail);
-
+  
     if (!users || users.length === 0)
       return {
-        success: false,
-        message: "No users found for news email",
-      };
+      success: false,
+      message: "No users found for news email",
+    };
 
-    // Step #2: For each user, get watchlist symbols -> fetch news (fallback to general)
     const results = await step.run("fetch-user-news", async () => {
       const perUser: Array<{
         user: UserForNewsEmail;
         articles: MarketNewsArticle[];
       }> = [];
       for (const user of users as UserForNewsEmail[]) {
-        try {
-          const symbols = await getWatchlistSymbolsByEmail(user.email);
-          let articles = await getNews(symbols);
-          // Enforce max 6 articles per user
-          articles = (articles || []).slice(0, 6);
-          // If still empty, fallback to general
-          if (!articles || articles.length === 0) {
-            articles = await getNews();
-            articles = (articles || []).slice(0, 6);
-          }
-          perUser.push({ user, articles });
-        } catch (e) {
+          try {
+              const symbols = await getWatchlistSymbolsByEmail(user.email);
+              let articles = await getNews(symbols);
+              articles = (articles || []).slice(0, 6);
+              if (!articles || articles.length === 0) {
+                  articles = await getNews();
+                  articles = (articles || []).slice(0, 6);
+              }
+              perUser.push({ user, articles });
+          } catch (e) {
           console.error("daily-news: error preparing user news", user.email, e);
-          perUser.push({ user, articles: [] });
-        }
+              perUser.push({ user, articles: [] });
+          }
       }
       return perUser;
-    });
+  });
 
-    // Step #3: (placeholder) Summarize news via AI
     const userNewsSummaries: {
       user: UserForNewsEmail;
       newsContent: string | null;
     }[] = [];
 
-    for (const { user, articles } of results) {
-      try {
+        for (const { user, articles } of results) {
+                try {
         const prompt = NEWS_SUMMARY_EMAIL_PROMPT.replace(
           "{{newsData}}",
           JSON.stringify(articles, null, 2)
         );
 
-        const response = await step.ai.infer(`summarize-news-${user.email}`, {
+                    const response = await step.ai.infer(`summarize-news-${user.email}`, {
           model: step.ai.models.gemini({ model: "gemini-2.5-flash-lite" }),
-          body: {
+                        body: {
             contents: [{ role: "user", parts: [{ text: prompt }] }],
           },
-        });
+                    });
 
-        const part = response.candidates?.[0]?.content?.parts?.[0];
+                    const part = response.candidates?.[0]?.content?.parts?.[0];
         const newsContent =
           (part && "text" in part ? part.text : null) || "No market news.";
 
-        userNewsSummaries.push({ user, newsContent });
-      } catch (e) {
+                    userNewsSummaries.push({ user, newsContent });
+                } catch (e) {
         console.error("Failed to summarize news for : ", user.email);
-        userNewsSummaries.push({ user, newsContent: null });
-      }
-    }
+                    userNewsSummaries.push({ user, newsContent: null });
+                }
+            }
 
-    // Step #4: (placeholder) Send the emails
     await step.run("send-news-emails", async () => {
       await Promise.all(
         userNewsSummaries.map(async ({ user, newsContent }) => {
@@ -153,7 +150,6 @@ export const checkPriceAlerts = inngest.createFunction(
   { id: "check-price-alerts" },
   [{ cron: "*/5 * * * *" }], 
   async ({ step }) => {
-    // Step 1: Fetch all active alerts from database
     const activeAlerts = await step.run("fetch-active-alerts", async () => {
       await connectToDatabase();
       const alerts = await PriceAlertModel.find({ isActive: true }).lean();
@@ -189,7 +185,6 @@ export const checkPriceAlerts = inngest.createFunction(
             const quote = await getStockQuote(symbol);
             return { symbol, price: quote?.currentPrice || null };
           } catch (error) {
-            console.error(`Error fetching price for ${symbol}:`, error);
             return { symbol, price: null };
           }
         })
@@ -282,7 +277,6 @@ export const checkPriceAlerts = inngest.createFunction(
             });
           }
         } catch (error) {
-          console.error(`Error fetching user info for ${userId}:`, error);
         }
       }
 
@@ -309,8 +303,50 @@ export const checkPriceAlerts = inngest.createFunction(
               { $set: { triggeredAt: new Date() } }
             );
           } catch (error) {
+          }
+        })
+      );
+    });
+
+    await step.run("send-push-notifications", async () => {
+      const uniqueUserIds = [...new Set(alertsWithUserInfo.map((a) => a.alert.userId))];
+      
+      await Promise.allSettled(
+        uniqueUserIds.map(async (userId) => {
+          try {
+            const subscriptions = await getPushSubscriptionsByUserId(userId);
+            
+            if (subscriptions.length === 0) {
+              return;
+            }
+
+            const userAlerts = alertsWithUserInfo.filter(
+              (a) => a.alert.userId === userId
+            );
+
+            for (const { alert, currentPrice } of userAlerts) {
+              const alertEmoji = alert.alertType === "upper" ? "📈" : "📉";
+              const alertDirection = alert.alertType === "upper" ? "above" : "below";
+              
+              await sendPushNotifications(
+                subscriptions,
+                {
+                  title: `${alertEmoji} Price Alert: ${alert.symbol}`,
+                  body: `${alert.symbol} (${alert.company}) is ${alertDirection} your target price of $${alert.threshold.toFixed(2)}. Current price: $${currentPrice.toFixed(2)}`,
+                  icon: "/favicon.ico",
+                  badge: "/favicon.ico",
+                  data: {
+                    url: `/search?symbol=${alert.symbol}`,
+                    symbol: alert.symbol,
+                    alertId: alert._id,
+                    type: "price-alert",
+                  },
+                }
+              );
+            }
+          } catch (error) {
             console.error(
-              `Error sending alert email for ${alert.symbol} to ${email}:`,
+              `Error sending push notifications for user ${userId}:`,
               error
             );
           }
@@ -320,7 +356,7 @@ export const checkPriceAlerts = inngest.createFunction(
 
     return {
       success: true,
-      message: "Price alerts checked and emails sent",
+      message: "Price alerts checked and notifications sent",
       checked: activeAlerts.length,
       triggered: alertsWithUserInfo.length,
     };

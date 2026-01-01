@@ -94,7 +94,6 @@ export default function CreateAlertDialog({
           setSuggestionsOpen(false);
         }
       } catch (error) {
-        console.error("Error searching stocks:", error);
         setSuggestions([]);
         setSuggestionsOpen(false);
       } finally {
@@ -135,7 +134,7 @@ export default function CreateAlertDialog({
             }
           }
         } catch (error) {
-          console.error("Error fetching price:", error);
+          // Error fetching price - silently fail
         } finally {
           setFetchingPrice(false);
         }
@@ -197,7 +196,6 @@ export default function CreateAlertDialog({
         onAlertCreated();
         onOpenChange(false);
       } else {
-        // Check if this is an upgrade-required error
         if (result.upgradeRequired || result.error?.includes("limit") || result.error?.includes("Upgrade")) {
           setUpgradeReason(result.error || "You've reached your alert limit");
           setUpgradeDialogOpen(true);
@@ -206,7 +204,6 @@ export default function CreateAlertDialog({
         }
       }
     } catch (error) {
-      console.error("Error creating alert:", error);
       toast.error("Failed to create alert");
     } finally {
       setLoading(false);
@@ -218,7 +215,6 @@ export default function CreateAlertDialog({
     setValue("company", stock.name || stock.symbol);
     setSuggestionsOpen(false);
     
-    // Fetch current price
     getStockQuote(stock.symbol).then((quote) => {
       if (quote) {
         setCurrentPrice(quote.currentPrice);

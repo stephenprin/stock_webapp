@@ -28,13 +28,11 @@ export default function UpgradeDialog({
   const currentPlanInfo = (plan === "pro" || plan === "enterprise") ? PLAN_FEATURES[plan] : null;
   const isAlreadyOnPlan = plan === targetPlan || 
     (targetPlan === "pro" && plan === "enterprise");
-  // Check if upgrading from a paid plan to a higher tier
   const isUpgrading = (plan === "pro" && targetPlan === "enterprise");
 
   const handleUpgrade = async () => {
     try {
       setUpgrading(true);
-      // Set success URL to redirect back to portfolio page after payment
       const successUrl = `${window.location.origin}/portfolio?upgraded=true`;
       const result = await upgrade({ productId: targetPlan, successUrl });
     
@@ -47,15 +45,13 @@ export default function UpgradeDialog({
         if ('data' in result && result.data) {
           const data = result.data as any;
         
-          
-            // Check if there's a checkout URL to redirect to Stripe
-            if (data.checkout_url && typeof data.checkout_url === 'string') {
-              toast.success(`Almost there! Taking you to secure checkout...`);
-              setTimeout(() => {
-                window.location.href = data.checkout_url;
-              }, 600);
-              return;
-            }
+          if (data.checkout_url && typeof data.checkout_url === 'string') {
+            toast.success(`Almost there! Taking you to secure checkout...`);
+            setTimeout(() => {
+              window.location.href = data.checkout_url;
+            }, 600);
+            return;
+          }
           
           toast.success(`Successfully upgraded to ${planInfo.name}!`);
           onOpenChange(false);
@@ -66,7 +62,6 @@ export default function UpgradeDialog({
         }
       }
       
-      // Fallback - assume success
       console.log("Upgrade completed (fallback)");
       toast.success(`Upgrade initiated for ${planInfo.name}!`);
       onOpenChange(false);

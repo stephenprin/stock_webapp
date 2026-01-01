@@ -15,7 +15,6 @@ export default function CreatingAccountPage() {
     let cancelled = false;
 
     const run = async () => {
-      // Ensure we always show the "polling" page for ~10s before routing on success.
       const minLoadDone = new Promise<void>((resolve) => {
         minLoadTimer = setTimeout(() => resolve(), 10000);
       });

@@ -67,7 +67,6 @@ export default function AlertsList({
         toast.error(result.error || "Failed to delete alert");
       }
     } catch (error) {
-      console.error("Error deleting alert:", error);
       toast.error("Failed to delete alert");
     } finally {
       setDeletingAlertId(null);
@@ -90,7 +89,6 @@ export default function AlertsList({
         toast.error(result.error || "Failed to toggle alert status");
       }
     } catch (error) {
-      console.error("Error toggling alert status:", error);
       toast.error("Failed to toggle alert status");
     } finally {
       setTogglingAlertId(null);

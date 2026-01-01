@@ -183,7 +183,6 @@ export default function AddPositionDialog({
         onPositionAdded();
         onOpenChange(false);
       } else {
-        // Check if this is an upgrade-required error
         if (result.error && result.error.includes("Upgrade to Pro")) {
           setUpgradeReason(result.error);
           setUpgradeDialogOpen(true);

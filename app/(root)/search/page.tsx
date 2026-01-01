@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import AddPositionDialog from "@/components/portfolio/AddPositionDialog";
 import CreateAlertDialog from "@/components/alerts/CreateAlertDialog";
 import { formatCurrency, formatPercent } from "@/lib/utils/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
@@ -59,7 +60,6 @@ export default function SearchPage() {
       setProfile(profileData);
       setNews(newsData || []);
 
-      // Check if stock is in portfolio
       if (portfolioData.success && portfolioData.holdings) {
         const isInPortfolio = portfolioData.holdings.some(
           (h: any) => h.symbol.toUpperCase() === symbol.toUpperCase()
@@ -76,11 +76,120 @@ export default function SearchPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-yellow-500 mx-auto mb-4" />
-          <p className="text-gray-400">Loading stock data...</p>
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Header Skeleton */}
+        <div className="mb-8">
+          <div className="flex items-start justify-between mb-6">
+            <div className="flex-1">
+              <div className="flex items-center gap-4 mb-2">
+                <Skeleton className="w-16 h-16 rounded-lg" />
+                <div>
+                  <Skeleton className="h-10 w-24 mb-2" />
+                  <Skeleton className="h-6 w-48" />
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-4 mt-4">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Skeleton className="h-10 w-40" />
+              <Skeleton className="h-10 w-32" />
+            </div>
+          </div>
+
+          {/* Price Card Skeleton */}
+          <Card className="bg-gray-800 border-gray-700 mb-6">
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i}>
+                    <Skeleton className="h-4 w-24 mb-2" />
+                    <Skeleton className="h-8 w-32" />
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mt-6 pt-6 border-t border-gray-700">
+                {[1, 2, 3].map((i) => (
+                  <div key={i}>
+                    <Skeleton className="h-4 w-16 mb-2" />
+                    <Skeleton className="h-6 w-24" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Symbol Info Widget Skeleton */}
+          <div className="mb-6">
+            <Skeleton className="h-[170px] w-full rounded-lg" />
+          </div>
         </div>
+
+        {/* Chart and Info Grid Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Main Chart Skeleton */}
+          <div className="lg:col-span-2">
+            <Card className="bg-gray-800 border-gray-700">
+              <CardHeader>
+                <Skeleton className="h-6 w-32 mb-2" />
+                <Skeleton className="h-4 w-48" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-[500px] w-full" />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Company Info Skeleton */}
+          <div className="space-y-6">
+            <Card className="bg-gray-800 border-gray-700">
+              <CardHeader>
+                <Skeleton className="h-6 w-40" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i}>
+                    <Skeleton className="h-4 w-20 mb-2" />
+                    <Skeleton className="h-6 w-full" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gray-800 border-gray-700">
+              <CardHeader>
+                <Skeleton className="h-6 w-20" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-24 w-full" />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* News Section Skeleton */}
+        <Card className="bg-gray-800 border-gray-700">
+          <CardHeader>
+            <Skeleton className="h-6 w-32 mb-2" />
+            <Skeleton className="h-4 w-48" />
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                  <Skeleton className="h-3 w-24 mb-2" />
+                  <Skeleton className="h-5 w-full mb-2" />
+                  <Skeleton className="h-4 w-full mb-1" />
+                  <Skeleton className="h-4 w-3/4 mb-2" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
