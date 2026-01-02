@@ -219,7 +219,9 @@ declare global {
         alertName: string;
         currentPrice: number;
         alertType: 'upper' | 'lower';
-        threshold: number;
+        alertSubType?: 'price' | 'percentage' | 'volume' | 'technical';
+        threshold?: number;
+        percentageThreshold?: number;
         changePercent?: number;
     };
 

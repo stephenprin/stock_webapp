@@ -23,12 +23,22 @@ import PushNotificationButton from "@/components/notifications/PushNotificationB
 import { toast } from "sonner";
 import { formatCurrency, formatPercent } from "@/lib/utils/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { getUserPhoneNumber, updateUserPhoneNumber, updateSMSNotificationsEnabled } from "@/lib/actions/user.actions";
+import { Lock, Phone, Save, Bell, BellOff } from "lucide-react";
 
 export default function SettingsPage() {
   const { plan, customer, isFree, isPro, isEnterprise, openBillingPortal, loading } = useSubscription();
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
   const [targetPlan, setTargetPlan] = useState<"pro" | "enterprise">("pro");
   const [openingPortal, setOpeningPortal] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [savedPhoneNumber, setSavedPhoneNumber] = useState("");
+  const [smsNotificationsEnabled, setSmsNotificationsEnabled] = useState(true);
+  const [phoneNumberLoading, setPhoneNumberLoading] = useState(true);
+  const [savingPhone, setSavingPhone] = useState(false);
+  const [togglingSMS, setTogglingSMS] = useState(false);
 
   const planInfo = plan !== "free" ? PLAN_FEATURES[plan] : null;
   const nextPlan = isFree ? "pro" : isPro ? "enterprise" : null;
@@ -76,6 +86,71 @@ export default function SettingsPage() {
       month: "long",
       day: "numeric",
     });
+  };
+
+  useEffect(() => {
+    const fetchPhoneNumber = async () => {
+      if (isPro || isEnterprise) {
+        setPhoneNumberLoading(true);
+        try {
+          const result = await getUserPhoneNumber();
+          if (result.success) {
+            setSavedPhoneNumber(result.phoneNumber || "");
+            setSmsNotificationsEnabled(result.smsNotificationsEnabled !== false);
+          } else {
+            setSavedPhoneNumber("");
+            setSmsNotificationsEnabled(true);
+          }
+        } catch (error) {
+          console.error("Error fetching phone number:", error);
+        } finally {
+          setPhoneNumberLoading(false);
+        }
+      }
+    };
+
+    fetchPhoneNumber();
+  }, [isPro, isEnterprise]);
+
+  const handleSavePhoneNumber = async () => {
+    if (!phoneNumber || phoneNumber.trim() === "") {
+      toast.error("Please enter a phone number");
+      return;
+    }
+
+    const phoneToSave = phoneNumber.trim();
+    setSavingPhone(true);
+    try {
+      const result = await updateUserPhoneNumber(phoneToSave);
+      if (result.success) {
+        // Wait a moment for database to update
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Refetch to get the formatted phone number from database
+        const fetchResult = await getUserPhoneNumber();
+        if (fetchResult.success) {
+          const saved = fetchResult.phoneNumber || "";
+          setSavedPhoneNumber(saved);
+          setPhoneNumber(""); // Clear the input field
+          
+          if (saved) {
+            toast.success(`Phone number saved: ${saved}`, { duration: 4000 });
+          } else {
+            toast.success("Phone number updated successfully");
+          }
+        } else {
+          toast.success("Phone number updated successfully");
+          setPhoneNumber(""); 
+        }
+      } else {
+        toast.error(result.error || "Failed to update phone number");
+      }
+    } catch (error) {
+      console.error("Error saving phone number:", error);
+      toast.error("Failed to update phone number");
+    } finally {
+      setSavingPhone(false);
+    }
   };
 
   return (
@@ -381,6 +456,156 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <PushNotificationButton />
+        </CardContent>
+      </Card>
+
+      {/* SMS Notifications Section - Pro Only */}
+      <Card className="bg-gray-800 border-gray-700 mb-6">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Phone className="h-5 w-5" />
+            SMS Alerts
+          </CardTitle>
+          <CardDescription className="text-gray-400">
+            {isPro || isEnterprise 
+              ? "Configure your phone number to receive SMS alerts for price movements"
+              : "Upgrade to Pro to receive SMS alerts for price movements"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading || phoneNumberLoading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-32" />
+            </div>
+          ) : isPro || isEnterprise ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Label htmlFor="phoneNumber" className="text-sm font-medium text-gray-300">
+                    Phone Number
+                  </Label>
+                  {savedPhoneNumber && savedPhoneNumber.trim() !== "" && (
+                    <span className="text-sm text-green-400 font-medium">
+                      ✓ {savedPhoneNumber}
+                    </span>
+                  )}
+                </div>
+                <Input
+                  id="phoneNumber"
+                  type="tel"
+                  placeholder="+1 (555) 123-4567"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-500 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                />
+                <p className="text-xs text-gray-500">
+                  Enter your phone number to receive SMS alerts. Format: +1 (555) 123-4567
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleSavePhoneNumber}
+                  disabled={savingPhone || !phoneNumber || phoneNumber.trim() === ""}
+                  className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingPhone ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Phone Number
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {savedPhoneNumber && savedPhoneNumber.trim() !== "" && (
+                <div className="mt-4 p-4 bg-gray-700/50 border border-gray-600 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h4 className="text-white font-medium text-sm mb-1">SMS/WhatsApp Notifications</h4>
+                      <p className="text-xs text-gray-400">
+                        {smsNotificationsEnabled 
+                          ? "You'll receive SMS/WhatsApp notifications when price alerts trigger"
+                          : "SMS/WhatsApp notifications are disabled"}
+                      </p>
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        setTogglingSMS(true);
+                        try {
+                          const newValue = !smsNotificationsEnabled;
+                          const result = await updateSMSNotificationsEnabled(newValue);
+                          if (result.success) {
+                            setSmsNotificationsEnabled(newValue);
+                            toast.success(
+                              newValue 
+                                ? "SMS/WhatsApp notifications enabled" 
+                                : "SMS/WhatsApp notifications disabled"
+                            );
+                          } else {
+                            toast.error(result.error || "Failed to update notification preference");
+                          }
+                        } catch (error) {
+                          toast.error("Failed to update notification preference");
+                        } finally {
+                          setTogglingSMS(false);
+                        }
+                      }}
+                      disabled={togglingSMS}
+                      variant={smsNotificationsEnabled ? "default" : "outline"}
+                      className={
+                        smsNotificationsEnabled
+                          ? "bg-green-500 hover:bg-green-600 text-white"
+                          : "border-gray-600 text-gray-400 hover:bg-gray-700"
+                      }
+                    >
+                      {togglingSMS ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Updating...
+                        </>
+                      ) : smsNotificationsEnabled ? (
+                        <>
+                          <Bell className="h-4 w-4 mr-2" />
+                          Enabled
+                        </>
+                      ) : (
+                        <>
+                          <BellOff className="h-4 w-4 mr-2" />
+                          Disabled
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-4 bg-gray-700/50 border border-gray-600 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Lock className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-300">SMS Alerts (Pro Feature)</span>
+                </div>
+                <Button
+                  onClick={() => handleUpgradeClick("pro")}
+                  variant="outline"
+                  size="sm"
+                  className="border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10"
+                >
+                  Upgrade to Pro
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Get instant SMS notifications when your price alerts trigger. Never miss a market movement.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

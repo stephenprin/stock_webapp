@@ -62,7 +62,6 @@ export default function UpgradeDialog({
         }
       }
       
-      console.log("Upgrade completed (fallback)");
       toast.success(`Upgrade initiated for ${planInfo.name}!`);
       onOpenChange(false);
     } catch (error: any) {

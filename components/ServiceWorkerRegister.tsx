@@ -12,15 +12,11 @@ export default function ServiceWorkerRegister() {
       navigator.serviceWorker
         .register("/sw.js", { scope: "/" })
         .then((registration) => {
-          console.log("[ServiceWorker] Registered successfully:", registration.scope);
-          
-          // Check for updates
           registration.addEventListener("updatefound", () => {
             const newWorker = registration.installing;
             if (newWorker) {
               newWorker.addEventListener("statechange", () => {
                 if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-                  console.log("[ServiceWorker] New service worker installed, reload to activate");
                 }
               });
             }
