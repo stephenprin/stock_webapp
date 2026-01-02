@@ -78,6 +78,9 @@ declare global {
         id: string;
         email: string;
         name: string;
+        investmentGoals?: string;
+        riskTolerance?: string;
+        preferredIndustry?: string;
     };
 
     type Stock = {

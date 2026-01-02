@@ -1,11 +1,12 @@
 import { getNews, getStockQuote } from "../actions/finnhub.actions";
-import { getAllUsersForNewsEmail } from "../actions/user.actions";
+import { getAllUsersForNewsEmail, getUserSubscriptionPlan, getPortfolioSymbolsByUserId } from "../actions/user.actions";
 import { getWatchlistSymbolsByEmail } from "../actions/watchlist.actiond";
 import { sendNewsSummaryEmail, sendWelcomeEmail, sendPriceAlertEmail } from "../nodemailer";
 import { getFormattedTodayDate } from "../utils/utils";
 import { inngest } from "./client";
 import {
   NEWS_SUMMARY_EMAIL_PROMPT,
+  PRO_NEWS_SUMMARY_EMAIL_PROMPT,
   PERSONALIZED_WELCOME_EMAIL_PROMPT,
 } from "./prompts";
 import { connectToDatabase } from "@/database/mongoose";
@@ -77,20 +78,43 @@ export const sendDailyNewsSummary = inngest.createFunction(
       const perUser: Array<{
         user: UserForNewsEmail;
         articles: MarketNewsArticle[];
+        subscriptionPlan: "free" | "pro" | "enterprise";
+        portfolioSymbols: string[];
+        watchlistSymbols: string[];
       }> = [];
       for (const user of users as UserForNewsEmail[]) {
           try {
-              const symbols = await getWatchlistSymbolsByEmail(user.email);
-              let articles = await getNews(symbols);
-              articles = (articles || []).slice(0, 6);
+              const subscriptionPlan = await getUserSubscriptionPlan(user.id);
+              const watchlistSymbols = await getWatchlistSymbolsByEmail(user.email);
+              const portfolioSymbols = subscriptionPlan !== "free" 
+                ? await getPortfolioSymbolsByUserId(user.id)
+                : [];
+              
+              const allSymbols = [...new Set([...watchlistSymbols, ...portfolioSymbols])];
+              const articleLimit = subscriptionPlan !== "free" ? 12 : 6;
+              
+              let articles = await getNews(allSymbols.length > 0 ? allSymbols : undefined);
+              articles = (articles || []).slice(0, articleLimit);
               if (!articles || articles.length === 0) {
                   articles = await getNews();
-                  articles = (articles || []).slice(0, 6);
+                  articles = (articles || []).slice(0, articleLimit);
               }
-              perUser.push({ user, articles });
+              perUser.push({ 
+                user, 
+                articles,
+                subscriptionPlan,
+                portfolioSymbols,
+                watchlistSymbols,
+              });
           } catch (e) {
           console.error("daily-news: error preparing user news", user.email, e);
-              perUser.push({ user, articles: [] });
+              perUser.push({ 
+                user, 
+                articles: [],
+                subscriptionPlan: "free" as const,
+                portfolioSymbols: [],
+                watchlistSymbols: [],
+              });
           }
       }
       return perUser;
@@ -101,12 +125,31 @@ export const sendDailyNewsSummary = inngest.createFunction(
       newsContent: string | null;
     }[] = [];
 
-        for (const { user, articles } of results) {
+        for (const { user, articles, subscriptionPlan, portfolioSymbols, watchlistSymbols } of results) {
                 try {
-        const prompt = NEWS_SUMMARY_EMAIL_PROMPT.replace(
-          "{{newsData}}",
-          JSON.stringify(articles, null, 2)
-        );
+        let prompt: string;
+        
+        if (subscriptionPlan !== "free") {
+          const userProfile = [
+            user.investmentGoals ? `Investment Goals: ${user.investmentGoals}` : null,
+            user.riskTolerance ? `Risk Tolerance: ${user.riskTolerance}` : null,
+            user.preferredIndustry ? `Preferred Industry: ${user.preferredIndustry}` : null,
+          ].filter(Boolean).join("\n");
+
+          prompt = PRO_NEWS_SUMMARY_EMAIL_PROMPT
+            .replace("{{userProfile}}", userProfile || "Not specified")
+            .replace("{{portfolioSymbols}}", portfolioSymbols.join(", ") || "None")
+            .replace("{{watchlistSymbols}}", watchlistSymbols.join(", ") || "None")
+            .replace("{{newsData}}", JSON.stringify(articles, null, 2))
+            .replace("{{investmentGoals}}", user.investmentGoals || "Not specified")
+            .replace("{{riskTolerance}}", user.riskTolerance || "Not specified")
+            .replace("{{preferredIndustry}}", user.preferredIndustry || "Not specified");
+        } else {
+          prompt = NEWS_SUMMARY_EMAIL_PROMPT.replace(
+            "{{newsData}}",
+            JSON.stringify(articles, null, 2)
+          );
+        }
 
                     const response = await step.ai.infer(`summarize-news-${user.email}`, {
           model: step.ai.models.gemini({ model: "gemini-2.5-flash-lite" }),

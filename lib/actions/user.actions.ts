@@ -1,10 +1,121 @@
 "use server";
 
 import { connectToDatabase } from "@/database/mongoose";
-import { auth } from "@/lib/better-auth/auth";
+import { auth, getAuth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { formatPhoneNumber, validatePhoneNumber } from "@/lib/services/sms.service";
 import { ObjectId } from "mongodb";
+
+export async function getUserSubscriptionPlan(userId: string, userEmail?: string): Promise<"free" | "pro" | "enterprise"> {
+    try {
+        const mongoose = await connectToDatabase();
+        const db = mongoose.connection.db;
+        
+        if (!db) {
+            console.error("[Subscription] Database connection not found");
+            return "free";
+        }
+
+        const queryConditions: any[] = [
+            { userId: userId },
+            { "user.id": userId },
+            { "user._id": userId }
+        ];
+
+        if (userEmail) {
+            queryConditions.push(
+                { "user.email": userEmail.toLowerCase() },
+                { email: userEmail.toLowerCase() }
+            );
+        }
+
+        const customer = await db.collection("autumn_customers").findOne({
+            $or: queryConditions
+        });
+
+        if (!customer) {
+            console.log(`[Subscription] No customer found for userId: ${userId}${userEmail ? `, email: ${userEmail}` : ""}`);
+            
+            const allCustomers = await db.collection("autumn_customers").find({}).limit(5).toArray();
+            console.log(`[Subscription] Sample customer records:`, allCustomers.map((c: any) => ({
+                id: c._id,
+                userId: c.userId,
+                user: c.user,
+                hasProducts: !!c.products,
+                productCount: c.products?.length || 0
+            })));
+            
+            return "free";
+        }
+
+        if (!customer.products || customer.products.length === 0) {
+            console.log(`[Subscription] Customer found but no products for userId: ${userId}`);
+            return "free";
+        }
+
+        const isActive = (status: string) => status === "active" || status === "trialing";
+
+        console.log(`[Subscription] Checking products for userId: ${userId}`, {
+            customerId: customer._id,
+            products: customer.products.map((p: any) => ({ 
+                id: p.id, 
+                productId: p.productId,
+                status: p.status,
+                name: p.name
+            }))
+        });
+
+        const hasEnterprise = customer.products.some((p: any) => {
+            const productId = p.id || p.productId || p.name;
+            const status = p.status;
+            const matches = (productId === "enterprise_plan" || 
+                          productId === "enterprise" || 
+                          productId?.toLowerCase() === "enterprise");
+            return matches && isActive(status);
+        });
+        if (hasEnterprise) {
+            console.log(`[Subscription] Enterprise subscription found for userId: ${userId}`);
+            return "enterprise";
+        }
+
+        const hasPro = customer.products.some((p: any) => {
+            const productId = p.id || p.productId || p.name;
+            const status = p.status;
+            const matches = (productId === "pro_plan" || 
+                          productId === "pro" || 
+                          productId?.toLowerCase() === "pro");
+            return matches && isActive(status);
+        });
+        if (hasPro) {
+            console.log(`[Subscription] Pro subscription found for userId: ${userId}`);
+            return "pro";
+        }
+
+        console.log(`[Subscription] No active Pro/Enterprise subscription for userId: ${userId}`);
+        return "free";
+    } catch (error) {
+        console.error("Error getting user subscription plan:", error);
+        return "free";
+    }
+}
+
+export async function getPortfolioSymbolsByUserId(userId: string): Promise<string[]> {
+    try {
+        const mongoose = await connectToDatabase();
+        const db = mongoose.connection.db;
+        if (!db) return [];
+
+        const { PortfolioHoldingModel } = await import("@/database/models/portfolio-holding.model");
+        const holdings = await PortfolioHoldingModel.find({ userId })
+            .select("symbol")
+            .lean();
+
+        return holdings.map((h) => String(h.symbol));
+    } catch (error) {
+        console.error("Error fetching portfolio symbols:", error);
+        return [];
+    }
+}
 
 export async function getUserPhoneNumber(): Promise<{
   success: boolean;
@@ -204,7 +315,14 @@ export async function updateUserPhoneNumber(phoneNumber: string): Promise<{
   }
 }
 
-export async function getAllUsersForNewsEmail(): Promise<Array<{ id: string; email: string; name: string }>> {
+export async function getAllUsersForNewsEmail(): Promise<Array<{ 
+    id: string; 
+    email: string; 
+    name: string;
+    investmentGoals?: string;
+    riskTolerance?: string;
+    preferredIndustry?: string;
+}>> {
     try {
         const mongoose = await connectToDatabase();
         const db = mongoose.connection.db;
@@ -212,13 +330,16 @@ export async function getAllUsersForNewsEmail(): Promise<Array<{ id: string; ema
 
         const users = await db.collection('user').find(
             { email: { $exists: true, $ne: null }},
-            { projection: { _id: 1, id: 1, email: 1, name: 1, country:1 }}
+            { projection: { _id: 1, id: 1, email: 1, name: 1, country: 1, investmentGoals: 1, riskTolerance: 1, preferredIndustry: 1 }}
         ).toArray();
 
         return users.filter((user) => user.email && user.name).map((user) => ({
             id: user.id || user._id?.toString() || '',
             email: user.email,
-            name: user.name
+            name: user.name,
+            investmentGoals: user.investmentGoals,
+            riskTolerance: user.riskTolerance,
+            preferredIndustry: user.preferredIndustry,
         }))
     } catch (e) {
         console.error('Error fetching users for news email:', e)

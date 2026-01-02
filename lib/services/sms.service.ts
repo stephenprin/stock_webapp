@@ -105,7 +105,7 @@ export async function sendPriceAlertSMS({
   const alertEmoji = alertType === "upper" ? "📈" : "📉";
   const alertDirection = alertType === "upper" ? "above" : "below";
   
-  const message = `${alertEmoji} Price Alert: ${symbol} (${company}) is ${alertDirection} your target price of $${targetPrice.toFixed(2)}. Current price: $${currentPrice.toFixed(2)}. View: https://stock-market-dev.vercel.app/search?symbol=${symbol}`;
+  const message = `${alertEmoji} Price Alert: ${symbol} (${company}) is ${alertDirection} your target price of $${targetPrice.toFixed(2)}. Current price: $${currentPrice.toFixed(2)}. View: http://localhost:3000/search?symbol=${symbol}`;
 
   return sendSMS({
     to: phoneNumber,
