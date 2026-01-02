@@ -702,7 +702,7 @@ export default function HomePage() {
               </Link>
             </div>
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} Signalist. All rights reserved.
+              © {new Date().getFullYear()} Stock Tracker. All rights reserved.
             </p>
           </div>
         </div>

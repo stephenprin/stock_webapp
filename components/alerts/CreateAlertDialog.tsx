@@ -12,12 +12,14 @@ import { createPriceAlert, CreatePriceAlertData } from "@/lib/actions/alerts.act
 import { searchStocksAction } from "@/lib/actions/portfolio.actions";
 import { getStockQuote } from "@/lib/actions/finnhub.actions";
 import { toast } from "sonner";
-import { Loader2, Check, ChevronsUpDown } from "lucide-react";
+import { Loader2, Check, ChevronsUpDown, Sparkles, Lock } from "lucide-react";
 import { useDebounce } from "@/lib/utils/debounce";
 import { cn } from "@/lib/utils/utils";
 import { ALERT_TYPE_OPTIONS } from "@/lib/constants";
 import UpgradeDialog from "@/components/billing/UpgradeDialog";
 import SelectField from "@/components/forms/SelectField";
+import { useSubscription } from "@/lib/hooks/useSubscription";
+import type { AlertSubType, Condition, TechnicalIndicatorConfig } from "@/database/models/price-alert.model";
 
 interface CreateAlertDialogProps {
   open: boolean;
@@ -32,7 +34,12 @@ interface FormData {
   company: string;
   alertName: string;
   alertType: "upper" | "lower";
-  threshold: number;
+  alertSubType: AlertSubType;
+  threshold?: number;
+  percentageThreshold?: number;
+  conditions?: Condition[];
+  conditionLogic?: "AND" | "OR";
+  technicalIndicator?: TechnicalIndicatorConfig;
 }
 
 export default function CreateAlertDialog({
@@ -42,6 +49,9 @@ export default function CreateAlertDialog({
   defaultSymbol = "",
   defaultCompany = "",
 }: CreateAlertDialogProps) {
+  const { isPro, isEnterprise } = useSubscription();
+  const hasAdvancedFeatures = isPro || isEnterprise;
+  
   const [loading, setLoading] = useState(false);
   const [fetchingPrice, setFetchingPrice] = useState(false);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
@@ -50,6 +60,7 @@ export default function CreateAlertDialog({
   const [searchingStocks, setSearchingStocks] = useState(false);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState<string>();
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
   const {
     register,
@@ -65,6 +76,7 @@ export default function CreateAlertDialog({
       company: defaultCompany,
       alertName: "",
       alertType: "upper",
+      alertSubType: "price",
       threshold: 0,
     },
   });
@@ -72,7 +84,9 @@ export default function CreateAlertDialog({
   const symbol = watch("symbol");
   const company = watch("company");
   const alertType = watch("alertType");
+  const alertSubType = watch("alertSubType");
   const threshold = watch("threshold");
+  const percentageThreshold = watch("percentageThreshold");
 
   // Search for stock suggestions as user types
   const performStockSearch = useCallback(
@@ -124,12 +138,12 @@ export default function CreateAlertDialog({
           const quote = await getStockQuote(symbol);
           if (quote) {
             setCurrentPrice(quote.currentPrice);
-            // Suggest threshold based on current price and alert type
-            if (!threshold || threshold === 0) {
+            const currentSubType = watch("alertSubType") || "price";
+            if (currentSubType === "price" && (!threshold || threshold === 0)) {
               const suggestedThreshold =
                 alertType === "upper"
-                  ? quote.currentPrice * 1.1 // 10% above
-                  : quote.currentPrice * 0.9; // 10% below
+                  ? quote.currentPrice * 1.1
+                  : quote.currentPrice * 0.9;
               setValue("threshold", Number(suggestedThreshold.toFixed(2)));
             }
           }
@@ -142,9 +156,8 @@ export default function CreateAlertDialog({
 
       return () => clearTimeout(timeoutId);
     }
-  }, [symbol, setValue, alertType, threshold]);
+  }, [symbol, setValue, alertType, alertSubType, threshold, watch]);
 
-  // Reset form when dialog opens
   useEffect(() => {
     if (open) {
       reset({
@@ -152,31 +165,47 @@ export default function CreateAlertDialog({
         company: defaultCompany,
         alertName: "",
         alertType: "upper",
+        alertSubType: "price",
         threshold: 0,
       });
       setCurrentPrice(null);
+      setShowAdvancedOptions(false);
 
       if (defaultSymbol) {
         getStockQuote(defaultSymbol).then((quote) => {
           if (quote) {
             setCurrentPrice(quote.currentPrice);
-            const suggestedThreshold = quote.currentPrice * 1.1;
-            setValue("threshold", Number(suggestedThreshold.toFixed(2)));
+            setTimeout(() => {
+              const currentSubType = watch("alertSubType") || "price";
+              if (currentSubType === "price") {
+                const suggestedThreshold = quote.currentPrice * 1.1;
+                setValue("threshold", Number(suggestedThreshold.toFixed(2)));
+              }
+            }, 100);
           }
         });
       }
     }
-  }, [open, defaultSymbol, defaultCompany, reset, setValue]);
+  }, [open, defaultSymbol, defaultCompany, reset, setValue, watch]);
 
   const onSubmit = async (data: FormData) => {
-    if (data.threshold <= 0) {
-      toast.error("Threshold must be greater than 0");
-      return;
-    }
-
     if (!data.symbol || !data.company) {
       toast.error("Please select a stock symbol and company");
       return;
+    }
+
+    if (data.alertSubType === "price" || data.alertSubType === "volume") {
+      if (!data.threshold || data.threshold <= 0) {
+        toast.error("Threshold must be greater than 0");
+        return;
+      }
+    }
+
+    if (data.alertSubType === "percentage") {
+      if (data.percentageThreshold === undefined || data.percentageThreshold === null) {
+        toast.error("Percentage threshold is required");
+        return;
+      }
     }
 
     setLoading(true);
@@ -184,9 +213,14 @@ export default function CreateAlertDialog({
       const alertData: CreatePriceAlertData = {
         symbol: data.symbol.toUpperCase().trim(),
         company: data.company.trim(),
-        alertName: data.alertName.trim() || `${data.symbol} ${data.alertType} alert`,
+        alertName: data.alertName.trim() || `${data.symbol} ${data.alertType} ${data.alertSubType} alert`,
         alertType: data.alertType,
-        threshold: Number(data.threshold),
+        alertSubType: data.alertSubType,
+        threshold: data.threshold ? Number(data.threshold) : undefined,
+        percentageThreshold: data.percentageThreshold,
+        conditions: data.conditions,
+        conditionLogic: data.conditionLogic,
+        technicalIndicator: data.technicalIndicator,
       };
 
       const result = await createPriceAlert(alertData);
@@ -218,11 +252,14 @@ export default function CreateAlertDialog({
     getStockQuote(stock.symbol).then((quote) => {
       if (quote) {
         setCurrentPrice(quote.currentPrice);
-        const suggestedThreshold =
-          alertType === "upper"
-            ? quote.currentPrice * 1.1
-            : quote.currentPrice * 0.9;
-        setValue("threshold", Number(suggestedThreshold.toFixed(2)));
+        const currentSubType = watch("alertSubType") || "price";
+        if (currentSubType === "price") {
+          const suggestedThreshold =
+            watch("alertType") === "upper"
+              ? quote.currentPrice * 1.1
+              : quote.currentPrice * 0.9;
+          setValue("threshold", Number(suggestedThreshold.toFixed(2)));
+        }
       }
     });
   };
@@ -359,6 +396,65 @@ export default function CreateAlertDialog({
               required
             />
 
+            {/* Advanced Alert Options - Pro Only */}
+            {hasAdvancedFeatures && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="alertSubType" className="text-sm font-medium text-gray-300 flex items-center gap-2">
+                    Alert Method <span className="text-xs text-yellow-500">(Pro)</span>
+                  </Label>
+                  <SelectField
+                    name="alertSubType"
+                    label=""
+                    placeholder="Select alert method"
+                    options={[
+                      { value: "price", label: "Price Threshold" },
+                      { value: "percentage", label: "Percentage Change" },
+                      { value: "volume", label: "Volume Spike" },
+                      { value: "technical", label: "Technical Indicator" },
+                    ]}
+                    control={control}
+                    error={errors.alertSubType}
+                  />
+                </div>
+
+                {alertSubType === "technical" && (
+                  <div className="p-4 bg-gray-800/50 border border-yellow-500/30 rounded-lg space-y-4">
+                    <div className="flex items-center gap-2 text-sm text-yellow-400">
+                      <Sparkles className="h-4 w-4" />
+                      <span className="font-medium">Technical Indicator Alert (Coming Soon)</span>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      Configure alerts based on technical indicators like RSI, Moving Averages, or MACD signals.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {!hasAdvancedFeatures && (
+              <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Lock className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-300">Advanced Alert Types</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setUpgradeDialogOpen(true)}
+                    className="border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10"
+                  >
+                    Upgrade to Pro
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Unlock percentage change alerts, volume alerts, and technical indicator alerts with Pro plan.
+                </p>
+              </div>
+            )}
+
             {/* Current Price Display */}
             {currentPrice && (
               <div className="p-4 bg-gray-800 border border-gray-700 rounded-lg">
@@ -367,62 +463,118 @@ export default function CreateAlertDialog({
               </div>
             )}
 
-            {/* Threshold */}
-            <div className="space-y-2">
-              <Label htmlFor="threshold" className="text-sm font-medium text-gray-300">
-                Price Threshold ($) *
-              </Label>
+            {/* Price/Volume Threshold */}
+            {(alertSubType === "price" || alertSubType === "volume") && (
+              <div className="space-y-2">
+                <Label htmlFor="threshold" className="text-sm font-medium text-gray-300">
+                  {alertSubType === "volume" ? "Volume Threshold (shares) *" : "Price Threshold ($) *"}
+                </Label>
               <Input
                 id="threshold"
                 type="number"
-                step="0.01"
+                step={alertSubType === "volume" ? "1000" : "0.01"}
                 min="0"
-                placeholder="Enter target price"
+                placeholder={alertSubType === "volume" ? "Enter volume threshold" : "Enter target price"}
                 {...register("threshold", {
-                  required: "Threshold is required",
+                  required: alertSubType === "price" || alertSubType === "volume" ? "Threshold is required" : false,
                   min: {
-                    value: 0.01,
+                    value: alertSubType === "volume" ? 1 : 0.01,
                     message: "Threshold must be greater than 0",
                   },
                   valueAsNumber: true,
+                  validate: (value) => {
+                    if ((alertSubType === "price" || alertSubType === "volume") && (!value || value <= 0)) {
+                      return "Threshold must be greater than 0";
+                    }
+                    return true;
+                  },
                 })}
                 className="w-full h-12 bg-gray-800 border-gray-600 text-white placeholder:text-gray-500 focus:ring-2 focus:ring-green-500 focus:border-green-500"
               />
-              {errors.threshold && (
-                <p className="text-sm text-red-400">{errors.threshold.message}</p>
-              )}
-              {currentPrice && threshold > 0 && (
-                <p className="text-xs text-gray-500">
-                  {alertType === "upper" ? (
-                    threshold > currentPrice ? (
+                {errors.threshold && (
+                  <p className="text-sm text-red-400">{errors.threshold.message}</p>
+                )}
+                {currentPrice && threshold && threshold > 0 && alertSubType === "price" && (
+                  <p className="text-xs text-gray-500">
+                    {alertType === "upper" ? (
+                      threshold > currentPrice ? (
+                        <span className="text-green-400">
+                          Alert will trigger when price reaches ${threshold.toFixed(2)} (${(
+                            ((threshold - currentPrice) / currentPrice) *
+                            100
+                          ).toFixed(1)}% above current)
+                        </span>
+                      ) : (
+                        <span className="text-yellow-400">
+                          Warning: Threshold (${threshold.toFixed(2)}) is below current price. Alert will trigger immediately.
+                        </span>
+                      )
+                    ) : (
+                      threshold < currentPrice ? (
+                        <span className="text-green-400">
+                          Alert will trigger when price drops to ${threshold.toFixed(2)} (${(
+                            ((currentPrice - threshold) / currentPrice) *
+                            100
+                          ).toFixed(1)}% below current)
+                        </span>
+                      ) : (
+                        <span className="text-yellow-400">
+                          Warning: Threshold (${threshold.toFixed(2)}) is above current price. Alert will trigger immediately.
+                        </span>
+                      )
+                    )}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Percentage Threshold */}
+            {alertSubType === "percentage" && (
+              <div className="space-y-2">
+                <Label htmlFor="percentageThreshold" className="text-sm font-medium text-gray-300">
+                  Percentage Change (%) *
+                </Label>
+                <Input
+                  id="percentageThreshold"
+                  type="number"
+                  step="0.1"
+                  min="-100"
+                  max="1000"
+                  placeholder={alertType === "upper" ? "e.g., 5 (for +5% increase)" : "e.g., -3 (for -3% decrease)"}
+                  {...register("percentageThreshold", {
+                    required: "Percentage threshold is required",
+                    min: {
+                      value: -100,
+                      message: "Percentage must be at least -100%",
+                    },
+                    max: {
+                      value: 1000,
+                      message: "Percentage cannot exceed 1000%",
+                    },
+                    valueAsNumber: true,
+                  })}
+                  className="w-full h-12 bg-gray-800 border-gray-600 text-white placeholder:text-gray-500 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                />
+                {errors.percentageThreshold && (
+                  <p className="text-sm text-red-400">{errors.percentageThreshold.message}</p>
+                )}
+                {currentPrice && percentageThreshold !== undefined && (
+                  <p className="text-xs text-gray-500">
+                    {alertType === "upper" ? (
                       <span className="text-green-400">
-                        Alert will trigger when price reaches ${threshold.toFixed(2)} (${(
-                          ((threshold - currentPrice) / currentPrice) *
-                          100
-                        ).toFixed(1)}% above current)
+                        Alert will trigger when {symbol} moves {percentageThreshold > 0 ? "+" : ""}{percentageThreshold.toFixed(1)}% 
+                        ({percentageThreshold > 0 ? "above" : "to"} ${(currentPrice * (1 + percentageThreshold / 100)).toFixed(2)})
                       </span>
                     ) : (
-                      <span className="text-yellow-400">
-                        Warning: Threshold (${threshold.toFixed(2)}) is below current price. Alert will trigger immediately.
-                      </span>
-                    )
-                  ) : (
-                    threshold < currentPrice ? (
                       <span className="text-green-400">
-                        Alert will trigger when price drops to ${threshold.toFixed(2)} (${(
-                          ((currentPrice - threshold) / currentPrice) *
-                          100
-                        ).toFixed(1)}% below current)
+                        Alert will trigger when {symbol} moves {percentageThreshold < 0 ? "" : "-"}{Math.abs(percentageThreshold).toFixed(1)}% 
+                        (to ${(currentPrice * (1 + percentageThreshold / 100)).toFixed(2)})
                       </span>
-                    ) : (
-                      <span className="text-yellow-400">
-                        Warning: Threshold (${threshold.toFixed(2)}) is above current price. Alert will trigger immediately.
-                      </span>
-                    )
-                  )}
-                </p>
-              )}
-            </div>
+                    )}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="flex justify-end gap-3 pt-4">
               <Button

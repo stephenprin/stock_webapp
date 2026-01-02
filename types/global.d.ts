@@ -78,6 +78,9 @@ declare global {
         id: string;
         email: string;
         name: string;
+        investmentGoals?: string;
+        riskTolerance?: string;
+        preferredIndustry?: string;
     };
 
     type Stock = {
@@ -219,7 +222,9 @@ declare global {
         alertName: string;
         currentPrice: number;
         alertType: 'upper' | 'lower';
-        threshold: number;
+        alertSubType?: 'price' | 'percentage' | 'volume' | 'technical';
+        threshold?: number;
+        percentageThreshold?: number;
         changePercent?: number;
     };
 

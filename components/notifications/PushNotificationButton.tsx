@@ -81,7 +81,6 @@ export default function PushNotificationButton() {
       const registration = await navigator.serviceWorker.register("/sw.js", {
         scope: "/",
       });
-      console.log("Service Worker registered:", registration);
       return registration;
     } catch (error) {
       console.error("Service Worker registration failed:", error);
@@ -256,23 +255,21 @@ export default function PushNotificationButton() {
           <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <h4 className="text-white font-medium text-sm mb-1">Full Test (Email + Push)</h4>
+                <h4 className="text-white font-medium text-sm mb-1">Full Test (Email + Push + SMS/WhatsApp)</h4>
                 <p className="text-xs text-gray-400">
-                  Test both email and push notifications together
+                  Test email, push notifications, and SMS/WhatsApp together
                 </p>
               </div>
               <Button
                 onClick={async () => {
                   setIsLoading(true);
                   try {
-                    console.log("[Test] Sending full diagnostic test...");
                     const response = await fetch("/api/push/test-full", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ testEmail: true, testPush: true }),
+                      body: JSON.stringify({ testEmail: true, testPush: true, testSMS: true }),
                     });
                     const result = await response.json();
-                    console.log("[Test] Full test result:", result);
                     
                     if (result.success) {
                       const emailStatus = result.results?.email?.success 
@@ -282,11 +279,16 @@ export default function PushNotificationButton() {
                         ? `✅ Push: Sent to ${result.results.push.sent} device(s)`
                         : `❌ Push: ${result.results?.push?.errors?.[0]?.error || "Failed"}`;
                       
+                      const smsStatus = result.results?.sms?.success
+                        ? `✅ SMS/WhatsApp: Sent`
+                        : result.results?.sms?.error 
+                          ? `❌ SMS/WhatsApp: ${result.results.sms.error}`
+                          : `⚠️ SMS/WhatsApp: Not configured`;
+                      
                       toast.success("Test completed!", {
-                        description: `${emailStatus} | ${pushStatus}`,
+                        description: `${emailStatus} | ${pushStatus} | ${smsStatus}`,
                         duration: 10000,
                       });
-                      console.log("[Test] Message:", result.message);
                     } else {
                       const errors = [];
                       if (result.results?.email && !result.results.email.success) {
@@ -295,7 +297,10 @@ export default function PushNotificationButton() {
                       if (result.results?.push && !result.results.push.success) {
                         errors.push(`Push: ${result.results.push.errors?.[0]?.error || "Failed"}`);
                       }
-                      toast.error("Test failed", {
+                      if (result.results?.sms && !result.results.sms.success) {
+                        errors.push(`SMS/WhatsApp: ${result.results.sms.error || "Failed"}`);
+                      }
+                      toast.error("Test completed with errors", {
                         description: errors.length > 0 ? errors.join(", ") : result.message || "Check console for details",
                         duration: 10000,
                       });

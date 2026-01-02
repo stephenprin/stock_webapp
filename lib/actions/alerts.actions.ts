@@ -7,12 +7,19 @@ import { PriceAlertModel } from "@/database/models/price-alert.model";
 import { getStockQuote } from "./finnhub.actions";
 import { checkSubscriptionStatus, getSubscriptionLimits } from "@/lib/utils/subscription";
 
+import type { AlertSubType, Condition, TechnicalIndicatorConfig } from "@/database/models/price-alert.model";
+
 export interface CreatePriceAlertData {
   symbol: string;
   company: string;
   alertName: string;
   alertType: "upper" | "lower";
-  threshold: number;
+  alertSubType?: AlertSubType;
+  threshold?: number;
+  conditions?: Condition[];
+  conditionLogic?: "AND" | "OR";
+  technicalIndicator?: TechnicalIndicatorConfig;
+  percentageThreshold?: number;
 }
 
 export async function createPriceAlert(
@@ -56,23 +63,47 @@ export async function createPriceAlert(
       };
     }
 
-    if (data.threshold <= 0) {
-      return {
-        success: false,
-        error: "Threshold must be greater than 0",
-      };
+    const alertSubType = data.alertSubType || "price";
+
+    if (alertSubType === "price" || alertSubType === "volume") {
+      if (!data.threshold || data.threshold <= 0) {
+        return {
+          success: false,
+          error: "Threshold must be greater than 0",
+        };
+      }
+    }
+
+    if (alertSubType === "percentage") {
+      if (data.percentageThreshold === undefined || data.percentageThreshold === null) {
+        return {
+          success: false,
+          error: "Percentage threshold is required for percentage alerts",
+        };
+      }
+    }
+
+    if (alertSubType === "technical") {
+      if (!data.technicalIndicator && (!data.conditions || data.conditions.length === 0)) {
+        return {
+          success: false,
+          error: "Technical indicator config or conditions are required for technical alerts",
+        };
+      }
     }
 
     const existingAlert = await PriceAlertModel.findOne({
       userId,
       symbol: data.symbol.toUpperCase(),
       alertType: data.alertType,
+      alertSubType,
+      alertName: data.alertName.trim(),
     });
 
     if (existingAlert) {
       return {
         success: false,
-        error: `You already have a ${data.alertType} alert for ${data.symbol.toUpperCase()}. Please update or delete the existing alert.`,
+        error: `You already have a ${data.alertType} ${alertSubType} alert named "${data.alertName}" for ${data.symbol.toUpperCase()}. Please update or delete the existing alert.`,
       };
     }
 
@@ -82,7 +113,12 @@ export async function createPriceAlert(
       company: data.company,
       alertName: data.alertName.trim(),
       alertType: data.alertType,
+      alertSubType,
       threshold: data.threshold,
+      conditions: data.conditions,
+      conditionLogic: data.conditionLogic || "AND",
+      technicalIndicator: data.technicalIndicator,
+      percentageThreshold: data.percentageThreshold,
       isActive: true,
     });
 
@@ -115,7 +151,13 @@ export interface PriceAlertPlain {
   company: string;
   alertName: string;
   alertType: "upper" | "lower";
-  threshold: number;
+  alertSubType?: AlertSubType;
+  threshold?: number;
+  conditions?: Condition[];
+  conditionLogic?: "AND" | "OR";
+  technicalIndicator?: TechnicalIndicatorConfig;
+  percentageThreshold?: number;
+  previousDayClose?: number;
   isActive: boolean;
   triggeredAt?: Date;
   currentPrice?: number;

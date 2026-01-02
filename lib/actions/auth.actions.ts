@@ -50,7 +50,7 @@ export const signUpWithEmail = async ({
 
     return { success: false, error: "Sign up failed" };
   } catch (e: any) {
-    console.log("Sign up failed", e);
+    console.error("Sign up failed", e);
     return { success: false, error: e.message || "Sign up failed" };
   }
 };
@@ -86,7 +86,7 @@ export const completeSignUp = async ({
 
     return { success: true };
   } catch (e: any) {
-    console.log("Failed to complete signup:", e);
+    console.error("Failed to complete signup:", e);
     return { success: false, error: "Failed to complete signup" };
   }
 };
@@ -97,7 +97,7 @@ export const signInWithEmail = async ({ email, password }: SignInFormData) => {
 
       return { success: true, data: response }
   } catch (e) {
-      console.log('Sign in failed', e)
+      console.error('Sign in failed', e)
       return { success: false, error: 'Sign in failed' }
   }
 }
@@ -106,7 +106,7 @@ export const signOut = async () => {
   try {
       await auth.api.signOut({ headers: await headers() });
   } catch (e) {
-      console.log('Sign out failed', e)
+      console.error('Sign out failed', e)
       return { success: false, error: 'Sign out failed' }
   }
 }
@@ -116,7 +116,7 @@ export const getSession = async () => {
     const session = await auth.api.getSession({ headers: await headers() });
     return { success: true, user: session?.user || null };
   } catch (e) {
-    console.log('Get session failed', e);
+    console.error('Get session failed', e);
     return { success: false, user: null };
   }
 }

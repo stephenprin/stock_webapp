@@ -1,17 +1,19 @@
 import { getNews, getStockQuote } from "../actions/finnhub.actions";
-import { getAllUsersForNewsEmail } from "../actions/user.actions";
+import { getAllUsersForNewsEmail, getUserSubscriptionPlan, getPortfolioSymbolsByUserId } from "../actions/user.actions";
 import { getWatchlistSymbolsByEmail } from "../actions/watchlist.actiond";
 import { sendNewsSummaryEmail, sendWelcomeEmail, sendPriceAlertEmail } from "../nodemailer";
 import { getFormattedTodayDate } from "../utils/utils";
 import { inngest } from "./client";
 import {
   NEWS_SUMMARY_EMAIL_PROMPT,
+  PRO_NEWS_SUMMARY_EMAIL_PROMPT,
   PERSONALIZED_WELCOME_EMAIL_PROMPT,
 } from "./prompts";
 import { connectToDatabase } from "@/database/mongoose";
 import { PriceAlertModel } from "@/database/models/price-alert.model";
 import { getPushSubscriptionsByUserId } from "@/lib/actions/push.actions";
 import { sendPushNotifications } from "@/lib/services/push-notification.service";
+import { sendPriceAlertSMS } from "@/lib/services/sms.service";
 
 export const sendSignUpEmail = inngest.createFunction(
   { id: "sign-up-email" },
@@ -76,20 +78,43 @@ export const sendDailyNewsSummary = inngest.createFunction(
       const perUser: Array<{
         user: UserForNewsEmail;
         articles: MarketNewsArticle[];
+        subscriptionPlan: "free" | "pro" | "enterprise";
+        portfolioSymbols: string[];
+        watchlistSymbols: string[];
       }> = [];
       for (const user of users as UserForNewsEmail[]) {
           try {
-              const symbols = await getWatchlistSymbolsByEmail(user.email);
-              let articles = await getNews(symbols);
-              articles = (articles || []).slice(0, 6);
+              const subscriptionPlan = await getUserSubscriptionPlan(user.id);
+              const watchlistSymbols = await getWatchlistSymbolsByEmail(user.email);
+              const portfolioSymbols = subscriptionPlan !== "free" 
+                ? await getPortfolioSymbolsByUserId(user.id)
+                : [];
+              
+              const allSymbols = [...new Set([...watchlistSymbols, ...portfolioSymbols])];
+              const articleLimit = subscriptionPlan !== "free" ? 12 : 6;
+              
+              let articles = await getNews(allSymbols.length > 0 ? allSymbols : undefined);
+              articles = (articles || []).slice(0, articleLimit);
               if (!articles || articles.length === 0) {
                   articles = await getNews();
-                  articles = (articles || []).slice(0, 6);
+                  articles = (articles || []).slice(0, articleLimit);
               }
-              perUser.push({ user, articles });
+              perUser.push({ 
+                user, 
+                articles,
+                subscriptionPlan,
+                portfolioSymbols,
+                watchlistSymbols,
+              });
           } catch (e) {
           console.error("daily-news: error preparing user news", user.email, e);
-              perUser.push({ user, articles: [] });
+              perUser.push({ 
+                user, 
+                articles: [],
+                subscriptionPlan: "free" as const,
+                portfolioSymbols: [],
+                watchlistSymbols: [],
+              });
           }
       }
       return perUser;
@@ -100,12 +125,31 @@ export const sendDailyNewsSummary = inngest.createFunction(
       newsContent: string | null;
     }[] = [];
 
-        for (const { user, articles } of results) {
+        for (const { user, articles, subscriptionPlan, portfolioSymbols, watchlistSymbols } of results) {
                 try {
-        const prompt = NEWS_SUMMARY_EMAIL_PROMPT.replace(
-          "{{newsData}}",
-          JSON.stringify(articles, null, 2)
-        );
+        let prompt: string;
+        
+        if (subscriptionPlan !== "free") {
+          const userProfile = [
+            user.investmentGoals ? `Investment Goals: ${user.investmentGoals}` : null,
+            user.riskTolerance ? `Risk Tolerance: ${user.riskTolerance}` : null,
+            user.preferredIndustry ? `Preferred Industry: ${user.preferredIndustry}` : null,
+          ].filter(Boolean).join("\n");
+
+          prompt = PRO_NEWS_SUMMARY_EMAIL_PROMPT
+            .replace("{{userProfile}}", userProfile || "Not specified")
+            .replace("{{portfolioSymbols}}", portfolioSymbols.join(", ") || "None")
+            .replace("{{watchlistSymbols}}", watchlistSymbols.join(", ") || "None")
+            .replace("{{newsData}}", JSON.stringify(articles, null, 2))
+            .replace("{{investmentGoals}}", user.investmentGoals || "Not specified")
+            .replace("{{riskTolerance}}", user.riskTolerance || "Not specified")
+            .replace("{{preferredIndustry}}", user.preferredIndustry || "Not specified");
+        } else {
+          prompt = NEWS_SUMMARY_EMAIL_PROMPT.replace(
+            "{{newsData}}",
+            JSON.stringify(articles, null, 2)
+          );
+        }
 
                     const response = await step.ai.infer(`summarize-news-${user.email}`, {
           model: step.ai.models.gemini({ model: "gemini-2.5-flash-lite" }),
@@ -161,7 +205,13 @@ export const checkPriceAlerts = inngest.createFunction(
         company: alert.company,
         alertName: alert.alertName,
         alertType: alert.alertType,
+        alertSubType: alert.alertSubType || "price",
         threshold: alert.threshold,
+        percentageThreshold: alert.percentageThreshold,
+        previousDayClose: alert.previousDayClose,
+        conditions: alert.conditions,
+        conditionLogic: alert.conditionLogic,
+        technicalIndicator: alert.technicalIndicator,
         triggeredAt: alert.triggeredAt,
       }));
     });
@@ -176,23 +226,33 @@ export const checkPriceAlerts = inngest.createFunction(
     }
 
     const uniqueSymbols = [...new Set(activeAlerts.map((alert) => alert.symbol))];
-    const priceMap = new Map<string, number>();
+    const stockDataMap = new Map<string, { currentPrice: number; previousClose: number; volume?: number }>();
 
-    await step.run("fetch-stock-prices", async () => {
-      const priceResults = await Promise.allSettled(
+    await step.run("fetch-stock-data", async () => {
+      const stockResults = await Promise.allSettled(
         uniqueSymbols.map(async (symbol) => {
           try {
             const quote = await getStockQuote(symbol);
-            return { symbol, price: quote?.currentPrice || null };
+            if (!quote) {
+              return { symbol, data: null };
+            }
+            return {
+              symbol,
+              data: {
+                currentPrice: quote.currentPrice,
+                previousClose: quote.previousClose,
+                volume: undefined,
+              },
+            };
           } catch (error) {
-            return { symbol, price: null };
+            return { symbol, data: null };
           }
         })
       );
 
-      priceResults.forEach((result) => {
-        if (result.status === "fulfilled" && result.value.price !== null) {
-          priceMap.set(result.value.symbol, result.value.price);
+      stockResults.forEach((result) => {
+        if (result.status === "fulfilled" && result.value.data !== null) {
+          stockDataMap.set(result.value.symbol, result.value.data);
         }
       });
     });
@@ -200,24 +260,51 @@ export const checkPriceAlerts = inngest.createFunction(
     const triggeredAlerts: Array<{
       alert: typeof activeAlerts[0];
       currentPrice: number;
+      evaluationReason?: string;
     }> = [];
 
-    for (const alert of activeAlerts) {
-      const currentPrice = priceMap.get(alert.symbol);
-      
-      if (!currentPrice) {
-        continue;
-      }
+    await step.run("evaluate-alerts", async () => {
+      const { evaluateAlert } = await import("@/lib/services/alert-evaluation.service");
 
-      const shouldTrigger =
-        alert.alertType === "upper"
-          ? currentPrice >= alert.threshold
-          : currentPrice <= alert.threshold;
+      for (const alert of activeAlerts) {
+        const stockData = stockDataMap.get(alert.symbol);
+        
+        if (!stockData) {
+          continue;
+        }
 
-      if (shouldTrigger && !alert.triggeredAt) {
-        triggeredAlerts.push({ alert, currentPrice });
+        if (alert.triggeredAt) {
+          continue;
+        }
+
+        const evaluationResult = await evaluateAlert(
+          {
+            alertSubType: alert.alertSubType,
+            alertType: alert.alertType,
+            threshold: alert.threshold,
+            percentageThreshold: alert.percentageThreshold,
+            previousDayClose: alert.previousDayClose || stockData.previousClose,
+            conditions: alert.conditions,
+            conditionLogic: alert.conditionLogic,
+            technicalIndicator: alert.technicalIndicator,
+          },
+          alert.symbol,
+          {
+            currentPrice: stockData.currentPrice,
+            previousClose: stockData.previousClose,
+            volume: stockData.volume,
+          }
+        );
+
+        if (evaluationResult.shouldTrigger) {
+          triggeredAlerts.push({
+            alert,
+            currentPrice: stockData.currentPrice,
+            evaluationReason: evaluationResult.reason,
+          });
+        }
       }
-    }
+    });
 
     if (triggeredAlerts.length === 0) {
       return {
@@ -236,12 +323,22 @@ export const checkPriceAlerts = inngest.createFunction(
         company: string;
         alertName: string;
         alertType: "upper" | "lower";
-        threshold: number;
+        alertSubType: string;
+        threshold?: number;
+        percentageThreshold?: number;
+        previousDayClose?: number;
+        conditions?: any[];
+        conditionLogic?: string;
+        technicalIndicator?: any;
         triggeredAt?: Date | string;
       };
       currentPrice: number;
       email: string;
       name: string;
+      phoneNumber?: string;
+      smsNotificationsEnabled?: boolean;
+      isPro: boolean;
+      evaluationReason?: string;
     };
 
     const alertsWithUserInfo = await step.run("fetch-user-info", async (): Promise<AlertWithUserInfo[]> => {
@@ -254,29 +351,59 @@ export const checkPriceAlerts = inngest.createFunction(
       }
 
       const userCollection = db.collection("user");
+      const customerCollection = db.collection("customer");
       const result: AlertWithUserInfo[] = [];
 
       for (const userId of uniqueUserIds) {
         try {
-          const user = await userCollection.findOne<{ id: string; email: string; name: string }>(
+          const user = await userCollection.findOne<{ id: string; email: string; name: string; phoneNumber?: string; smsNotificationsEnabled?: boolean }>(
             { id: userId },
-            { projection: { _id: 1, id: 1, email: 1, name: 1 } }
+            { projection: { _id: 1, id: 1, email: 1, name: 1, phoneNumber: 1, smsNotificationsEnabled: 1 } }
           );
 
-          if (user && user.email && user.name) {
-            const alertsForUser = triggeredAlerts.filter(
-              (t) => t.alert.userId === userId
-            );
-            alertsForUser.forEach(({ alert, currentPrice }) => {
-              result.push({
-                alert,
-                currentPrice,
-                email: user.email,
-                name: user.name,
-              });
-            });
+          if (!user || !user.email || !user.name) {
+            continue;
           }
+
+          let isPro = false;
+          try {
+            const customer = await customerCollection.findOne<{ 
+              userId?: string; 
+              products?: Array<{ id: string; status: string }> 
+            }>(
+              { userId },
+              { projection: { products: 1 } }
+            );
+
+            if (customer?.products) {
+              isPro = customer.products.some(
+                (p) => 
+                  (p.id === "pro_plan" || p.id === "enterprise_plan") &&
+                  (p.status === "active" || p.status === "trialing")
+              );
+            }
+          } catch (error) {
+            console.error(`Error checking subscription for user ${userId}:`, error);
+          }
+
+          const alertsForUser = triggeredAlerts.filter(
+            (t) => t.alert.userId === userId
+          );
+          
+          alertsForUser.forEach(({ alert, currentPrice, evaluationReason }) => {
+            result.push({
+              alert,
+              currentPrice,
+              email: user.email,
+              name: user.name,
+              phoneNumber: user.phoneNumber,
+              smsNotificationsEnabled: user.smsNotificationsEnabled !== false,
+              isPro,
+              evaluationReason,
+            });
+          });
         } catch (error) {
+          console.error(`Error fetching user info for ${userId}:`, error);
         }
       }
 
@@ -288,13 +415,17 @@ export const checkPriceAlerts = inngest.createFunction(
         alertsWithUserInfo.map(async ({ alert, currentPrice, email, name }) => {
           try {
           
+            const targetPrice = alert.alertSubType === "percentage" && alert.previousDayClose
+              ? alert.previousDayClose * (1 + (alert.percentageThreshold || 0) / 100)
+              : alert.threshold || currentPrice;
+
             await sendPriceAlertEmail({
               email,
               name,
               symbol: alert.symbol,
               company: alert.company,
               currentPrice,
-              targetPrice: alert.threshold,
+              targetPrice,
               alertType: alert.alertType,
             });
 
@@ -328,11 +459,20 @@ export const checkPriceAlerts = inngest.createFunction(
               const alertEmoji = alert.alertType === "upper" ? "📈" : "📉";
               const alertDirection = alert.alertType === "upper" ? "above" : "below";
               
+              let alertMessage = "";
+              if (alert.alertSubType === "percentage" && alert.percentageThreshold !== undefined) {
+                alertMessage = `${alert.symbol} (${alert.company}) moved ${alert.percentageThreshold > 0 ? "+" : ""}${alert.percentageThreshold.toFixed(1)}%. Current price: $${currentPrice.toFixed(2)}`;
+              } else if (alert.threshold !== undefined) {
+                alertMessage = `${alert.symbol} (${alert.company}) is ${alertDirection} your target price of $${alert.threshold.toFixed(2)}. Current price: $${currentPrice.toFixed(2)}`;
+              } else {
+                alertMessage = `${alert.symbol} (${alert.company}) alert triggered. Current price: $${currentPrice.toFixed(2)}`;
+              }
+              
               await sendPushNotifications(
                 subscriptions,
                 {
                   title: `${alertEmoji} Price Alert: ${alert.symbol}`,
-                  body: `${alert.symbol} (${alert.company}) is ${alertDirection} your target price of $${alert.threshold.toFixed(2)}. Current price: $${currentPrice.toFixed(2)}`,
+                  body: alertMessage,
                   icon: "/favicon.ico",
                   badge: "/favicon.ico",
                   data: {
@@ -347,6 +487,51 @@ export const checkPriceAlerts = inngest.createFunction(
           } catch (error) {
             console.error(
               `Error sending push notifications for user ${userId}:`,
+              error
+            );
+          }
+        })
+      );
+    });
+
+    await step.run("send-sms-notifications", async () => {
+      const proUsersWithPhone = alertsWithUserInfo.filter(
+        (a) => a.isPro && a.phoneNumber && a.phoneNumber.trim() !== "" && a.smsNotificationsEnabled !== false
+      );
+
+      if (proUsersWithPhone.length === 0) {
+        return;
+      }
+
+      await Promise.allSettled(
+        proUsersWithPhone.map(async ({ alert, currentPrice, phoneNumber }) => {
+          try {
+            if (!phoneNumber) {
+              return;
+            }
+
+            const targetPrice = alert.alertSubType === "percentage" && alert.previousDayClose
+              ? alert.previousDayClose * (1 + (alert.percentageThreshold || 0) / 100)
+              : alert.threshold || currentPrice;
+
+            const smsResult = await sendPriceAlertSMS({
+              phoneNumber,
+              symbol: alert.symbol,
+              company: alert.company,
+              currentPrice,
+              targetPrice,
+              alertType: alert.alertType,
+            });
+
+            if (!smsResult.success) {
+              console.error(
+                `Failed to send SMS to ${phoneNumber} for alert ${alert._id}:`,
+                smsResult.error
+              );
+            }
+          } catch (error) {
+            console.error(
+              `Error sending SMS for alert ${alert._id}:`,
               error
             );
           }

@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     const result = await sendPushNotifications(
       subscriptions,
       {
-        title: title || "🧪 Test Notification",
+        title: title || " Test Notification",
         body:
           messageBody ||
           "This is a test push notification to verify your setup is working correctly!",

@@ -42,7 +42,7 @@ CRITICAL FORMATTING REQUIREMENTS:
 - Second sentence should add helpful context or reinforce the personalization
 
 Example personalized outputs (showing obvious customization with TWO sentences):
-<p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">Thanks for joining Signalist! As someone focused on <strong>technology growth stocks</strong>, you'll love our real-time alerts for companies like the ones you're tracking. We'll help you spot opportunities before they become mainstream news.</p>
+<p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">Thanks for joining Stock Tracker! As someone focused on <strong>technology growth stocks</strong>, you'll love our real-time alerts for companies like the ones you're tracking. We'll help you spot opportunities before they become mainstream news.</p>
 
 <p class="mobile-text" style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #CCDADC;">Great to have you aboard! Perfect for your <strong>conservative retirement strategy</strong> — we'll help you monitor dividend stocks without overwhelming you with noise. You can finally track your portfolio progress with confidence and clarity.</p>
 
@@ -198,6 +198,74 @@ Apple Stock Jumped After Great Earnings Report
 <a href="https://example.com/article2" style="color: #FDD458; text-decoration: none; font-weight: 500; font-size: 14px;" target="_blank" rel="noopener noreferrer">Read Full Story →</a>
 </div>
 </div>`;
+
+export const PRO_NEWS_SUMMARY_EMAIL_PROMPT = `Generate highly personalized HTML content for a PRO user's market news summary email. This will be inserted into the NEWS_SUMMARY_EMAIL_TEMPLATE at the {{newsContent}} placeholder.
+
+User Profile:
+{{userProfile}}
+
+Portfolio Symbols (stocks they own):
+{{portfolioSymbols}}
+
+Watchlist Symbols (stocks they're tracking):
+{{watchlistSymbols}}
+
+News data to summarize:
+{{newsData}}
+
+PERSONALIZATION REQUIREMENTS FOR PRO USERS:
+You MUST create content that is highly personalized and tailored to THIS specific user by:
+
+1. **Portfolio-Focused Analysis**: Prioritize news about stocks they actually own (from portfolioSymbols). These should appear FIRST in your summary.
+
+2. **Watchlist Intelligence**: Include relevant news about stocks they're tracking (from watchlistSymbols), especially if it relates to entry/exit opportunities.
+
+3. **Investment Profile Integration**: 
+   - Reference their investment goals ({{investmentGoals}})
+   - Consider their risk tolerance ({{riskTolerance}})
+   - Focus on their preferred industry ({{preferredIndustry}}) when available
+
+4. **Advanced Insights**: Provide deeper analysis and context that free users don't get:
+   - Explain how news affects their specific portfolio positions
+   - Identify opportunities aligned with their investment goals
+   - Provide risk context based on their risk tolerance
+   - Suggest potential actions or considerations
+
+5. **Personalized Sections**: Create sections like:
+   - "📊 Your Portfolio Update" (for stocks they own)
+   - "👀 Stocks You're Watching" (for watchlist stocks)
+   - "🎯 Opportunities for [Their Investment Goals]" 
+   - "⚠️ Risk Considerations" (if they have conservative risk tolerance)
+
+CRITICAL FORMATTING REQUIREMENTS:
+- Return ONLY clean HTML content with NO markdown, NO code blocks, NO backticks
+- Use the SAME formatting structure as NEWS_SUMMARY_EMAIL_PROMPT
+- Include MORE articles (10-12 instead of 6) for Pro users
+- Each article should have MINIMUM 3 CONCISE bullet points
+- Prioritize portfolio stocks in the first section
+- Add personalized "Bottom Line" insights that reference their profile
+
+CONTENT GUIDELINES FOR PRO USERS:
+- Focus on ACTIONABLE insights they can use for their portfolio
+- Provide deeper context and analysis beyond surface-level news
+- Explain implications for their specific holdings and goals
+- Include sector/industry analysis if they have preferred industries
+- Suggest potential portfolio actions or considerations
+- Use more advanced (but still clear) language appropriate for Pro users
+- Include market sentiment and trend analysis
+- Connect news to their investment strategy
+
+PERSONALIZATION EXAMPLES:
+
+For a Growth investor with Tech focus:
+"Your tech-heavy portfolio saw positive momentum today, with several holdings benefiting from the sector rally..."
+
+For a Conservative investor:
+"Today's market volatility suggests a good time to review your defensive positions. Your conservative approach positions you well..."
+
+For someone tracking specific stocks:
+"One of your watchlist stocks, [SYMBOL], is showing strong momentum after today's earnings report. This might be a good entry point..."
+`;
 
 export const TRADINGVIEW_SYMBOL_MAPPING_PROMPT = `You are an expert in financial markets and trading platforms. Your task is to find the correct TradingView symbol that corresponds to a given Finnhub stock symbol.
 

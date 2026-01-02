@@ -139,11 +139,6 @@ export const sendPriceAlertEmail = async ({
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(`[Email] Price alert email sent successfully to ${email}`, {
-      messageId: info.messageId,
-      accepted: info.accepted,
-      rejected: info.rejected,
-    });
     return info;
   } catch (error) {
     console.error(`[Email] Failed to send price alert email to ${email}:`, error);
