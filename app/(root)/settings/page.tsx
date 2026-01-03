@@ -26,7 +26,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getUserPhoneNumber, updateUserPhoneNumber, updateSMSNotificationsEnabled } from "@/lib/actions/user.actions";
-import { Lock, Phone, Save, Bell, BellOff } from "lucide-react";
+import { Lock, Phone, Save, Bell, BellOff, Zap, HeadphonesIcon } from "lucide-react";
+import PrioritySupportBadge from "@/components/support/PrioritySupportBadge";
 
 export default function SettingsPage() {
   const { plan, customer, isFree, isPro, isEnterprise, openBillingPortal, loading } = useSubscription();
@@ -62,7 +63,6 @@ export default function SettingsPage() {
         toast.error("Unable to open billing portal. Please try again.");
       }
     } catch (error) {
-      console.error("Error opening billing portal:", error);
       toast.error("Unable to open billing portal. Please try again.");
     } finally {
       setOpeningPortal(false);
@@ -102,7 +102,6 @@ export default function SettingsPage() {
             setSmsNotificationsEnabled(true);
           }
         } catch (error) {
-          console.error("Error fetching phone number:", error);
         } finally {
           setPhoneNumberLoading(false);
         }
@@ -146,7 +145,6 @@ export default function SettingsPage() {
         toast.error(result.error || "Failed to update phone number");
       }
     } catch (error) {
-      console.error("Error saving phone number:", error);
       toast.error("Failed to update phone number");
     } finally {
       setSavingPhone(false);
@@ -236,6 +234,46 @@ export default function SettingsPage() {
                       {isPro ? "Switch to Enterprise" : "Upgrade to Pro"}
                     </Button>
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Priority Support Section */}
+          {!loading && (isPro || isEnterprise) && (
+            <div className="rounded-lg bg-gradient-to-r from-gray-700/50 to-gray-800/50 border border-gray-600 p-4 mb-6">
+              <div className="flex items-start gap-3">
+                {isEnterprise ? (
+                  <HeadphonesIcon className="h-5 w-5 text-purple-400 mt-0.5 shrink-0" />
+                ) : (
+                  <Zap className="h-5 w-5 text-yellow-400 mt-0.5 shrink-0" />
+                )}
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className="text-white font-semibold">
+                      {isEnterprise ? "Dedicated Support" : "Priority Support"}
+                    </h4>
+                    <Badge
+                      variant="outline"
+                      className={`${
+                        isEnterprise
+                          ? "border-purple-500/50 text-purple-400 bg-purple-500/10"
+                          : "border-yellow-500/50 text-yellow-400 bg-yellow-500/10"
+                      }`}
+                    >
+                      Active
+                    </Badge>
+                  </div>
+                  <p className="text-gray-300 text-sm leading-relaxed mb-2">
+                    {isEnterprise
+                      ? "You have direct access to our dedicated support team. For immediate assistance, email support@stocktracker.com or check your account email for dedicated support contacts."
+                      : "As a Pro subscriber, your support requests are prioritized with faster response times. Email support@stocktracker.com for assistance."}
+                  </p>
+                  <div className="flex items-center gap-4 text-xs text-gray-400">
+                    <span>✓ Faster response times</span>
+                    <span>✓ Priority ticket handling</span>
+                    {isEnterprise && <span>✓ Direct team access</span>}
+                  </div>
                 </div>
               </div>
             </div>
@@ -538,15 +576,32 @@ export default function SettingsPage() {
                       onClick={async () => {
                         setTogglingSMS(true);
                         try {
-                          const newValue = !smsNotificationsEnabled;
+                          const currentState = smsNotificationsEnabled;
+                          const newValue = !currentState;
+                          
                           const result = await updateSMSNotificationsEnabled(newValue);
                           if (result.success) {
+                            // Update local state immediately
                             setSmsNotificationsEnabled(newValue);
+                            
+                            // Show success message based on what we just set
                             toast.success(
                               newValue 
                                 ? "SMS/WhatsApp notifications enabled" 
                                 : "SMS/WhatsApp notifications disabled"
                             );
+                            
+                            // Optional: Refetch after a short delay to verify (but don't wait for it)
+                            setTimeout(async () => {
+                              const fetchResult = await getUserPhoneNumber();
+                              if (fetchResult.success) {
+                                const dbValue = fetchResult.smsNotificationsEnabled !== false;
+                                // Only update if it's different (data integrity check)
+                                if (dbValue !== newValue) {
+                                  setSmsNotificationsEnabled(dbValue);
+                                }
+                              }
+                            }, 500);
                           } else {
                             toast.error(result.error || "Failed to update notification preference");
                           }

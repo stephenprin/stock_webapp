@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PortfolioHolding } from "@/database/models/portfolio-holding.model";
-import { addPosition } from "@/lib/actions/portfolio.actions";
+import { updatePosition } from "@/lib/actions/portfolio.actions";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -63,17 +63,21 @@ export default function EditPositionDialog({
 
     setLoading(true);
     try {
-      // For editing, we'll update by adjusting the position
-      // This is a simplified approach - you might want to add a dedicated update endpoint
-      toast.info("Position editing - this will add a new transaction to adjust the position");
-      
-      // For now, just show a message that this feature needs transaction adjustment logic
-      toast.warning("Full edit functionality coming soon. Use 'Sell' and re-add to adjust position.");
-      
-      onPositionUpdated();
-      onOpenChange(false);
+      const result = await updatePosition({
+        holdingId: holding._id.toString(),
+        quantity: data.quantity,
+        averageCost: data.averageCost,
+        notes: data.notes || "",
+      });
+
+      if (result.success) {
+        toast.success(result.message || "Position updated successfully");
+        onPositionUpdated();
+        onOpenChange(false);
+      } else {
+        toast.error(result.error || "Failed to update position");
+      }
     } catch (error) {
-      console.error("Error updating position:", error);
       toast.error("Failed to update position");
     } finally {
       setLoading(false);
@@ -88,7 +92,7 @@ export default function EditPositionDialog({
             Edit Position - {holding.symbol}
           </DialogTitle>
           <DialogDescription className="text-gray-400 mt-1">
-            Update position details (Full editing coming soon)
+            Update quantity, average cost, or notes for this position
           </DialogDescription>
         </DialogHeader>
 

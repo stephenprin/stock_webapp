@@ -31,7 +31,6 @@ export async function sendSMS({
   useWhatsApp: forceWhatsApp,
 }: SendSMSOptions): Promise<SMSResult> {
   if (!twilioClient) {
-    console.error("[SMS] Twilio client not initialized. Check environment variables.");
     return {
       success: false,
       error: "SMS service not configured",
@@ -42,7 +41,6 @@ export async function sendSMS({
   let fromNumber = shouldUseWhatsApp ? whatsappFromNumber : fromPhoneNumber;
 
   if (!fromNumber) {
-    console.error(`[SMS] ${shouldUseWhatsApp ? 'WhatsApp' : 'SMS'} phone number not configured.`);
     return {
       success: false,
       error: `${shouldUseWhatsApp ? 'WhatsApp' : 'SMS'} phone number not configured`,
@@ -76,7 +74,6 @@ export async function sendSMS({
       messageId: result.sid,
     };
   } catch (error) {
-    console.error(`[${shouldUseWhatsApp ? 'WhatsApp' : 'SMS'}] Failed to send message to ${to}:`, error);
     return {
       success: false,
       error:

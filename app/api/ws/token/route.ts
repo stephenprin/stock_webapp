@@ -17,19 +17,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Check local database first (fast cache)
+    // This is updated whenever subscription changes via useSubscription hook
     const plan = await getUserSubscriptionPlan(session.user.id, session.user.email);
     
-    console.log(`[WS Token] User ${session.user.id} (${session.user.email}) subscription plan: ${plan}`);
-    
     if (plan !== "pro" && plan !== "enterprise") {
-      console.log(`[WS Token] Access denied for user ${session.user.id} - plan: ${plan}`);
       return NextResponse.json(
-        { error: "Pro subscription required", plan },
+        { 
+          error: "Pro subscription required", 
+          plan: String(plan)
+        },
         { status: 403 }
       );
     }
-    
-    console.log(`[WS Token] Access granted for user ${session.user.id} - plan: ${plan}`);
 
     return NextResponse.json({
       userId: session.user.id,
@@ -37,7 +37,6 @@ export async function GET(request: NextRequest) {
       wsUrl: process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080",
     });
   } catch (error) {
-    console.error("Error generating WebSocket token:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -65,7 +65,6 @@ export default function UpgradeDialog({
       toast.success(`Upgrade initiated for ${planInfo.name}!`);
       onOpenChange(false);
     } catch (error: any) {
-      console.error("Upgrade error:", error);
       toast.error("Unable to start upgrade. Please try again or contact support.");
     } finally {
       setUpgrading(false);

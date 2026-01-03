@@ -16,21 +16,14 @@ export async function checkSubscriptionStatus(): Promise<{
       return { plan: "free" };
     }
 
-    // TODO: Integrate with Autumn API to get actual subscription status
-    // For now, default to free tier for all users
-    // This will be updated once Autumn customer records are created
     return {
       plan: "free",
     };
   } catch (error) {
-    console.error("Error checking subscription status:", error);
     return { plan: "free" };
   }
 }
 
-/**
- * Get subscription limits based on plan
- */
 export async function getSubscriptionLimits(plan: SubscriptionPlan): Promise<SubscriptionLimits> {
   switch (plan) {
     case "free":
@@ -77,9 +70,6 @@ export async function getSubscriptionLimits(plan: SubscriptionPlan): Promise<Sub
   }
 }
 
-/**
- * Check if user can access a specific feature
- */
 export async function canAccessFeature(
   featureName: keyof SubscriptionLimits
 ): Promise<boolean> {
@@ -95,7 +85,6 @@ export async function canAccessFeature(
     
     return true;
   } catch (error) {
-    console.error("Error checking feature access:", error);
     return false;
   }
 }
@@ -139,7 +128,6 @@ export async function enforceStockLimit(
       limit: limits.maxStocks,
     };
   } catch (error) {
-    console.error("Error enforcing stock limit:", error);
     return {
       allowed: true,
       currentCount: currentStockCount,
@@ -186,7 +174,6 @@ export async function enforceAlertLimit(
       limit: limits.maxAlerts,
     };
   } catch (error) {
-    console.error("Error enforcing alert limit:", error);
     return {
       allowed: true,
       currentCount: currentAlertCount,

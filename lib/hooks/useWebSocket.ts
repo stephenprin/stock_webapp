@@ -66,13 +66,20 @@ export function useWebSocket({
       const data = await response.json();
       return { userId: data.userId || null, isPro: true };
     } catch (error) {
-      console.error("Error getting auth token:", error);
       return { userId: null, isPro: false, error: "Failed to connect to authentication service" };
     }
   }, []);
 
   const connect = useCallback(async () => {
     if (!enabled || !isMountedRef.current) return;
+    
+    // Prevent multiple simultaneous connection attempts
+    if (wsRef.current) {
+      const state = wsRef.current.readyState;
+      if (state === WebSocket.CONNECTING || state === WebSocket.OPEN) {
+        return;
+      }
+    }
 
     const authResult = await getAuthToken();
     
@@ -92,7 +99,9 @@ export function useWebSocket({
     
     safeSetState(setIsPro, true);
 
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+    // Double check after async call
+    if (wsRef.current?.readyState === WebSocket.OPEN || 
+        wsRef.current?.readyState === WebSocket.CONNECTING) {
       return;
     }
 
@@ -103,13 +112,8 @@ export function useWebSocket({
 
       ws.onopen = () => {
         if (!isMountedRef.current) return;
-        safeSetState(setIsConnected, true);
         safeSetState(setError, null);
         reconnectAttempts.current = 0;
-        
-        if (symbols.length > 0) {
-          subscribe(symbols);
-        }
       };
 
       ws.onmessage = (event) => {
@@ -117,19 +121,19 @@ export function useWebSocket({
           const message: WebSocketMessage = JSON.parse(event.data);
           handleMessage(message);
         } catch (error) {
-          console.error("Error parsing WebSocket message:", error);
+          // Invalid message format
         }
       };
 
-      ws.onerror = (event) => {
+      ws.onerror = () => {
         if (!isMountedRef.current) return;
-        console.error("WebSocket error:", event);
         safeSetState(setError, "WebSocket connection error");
       };
 
       ws.onclose = (event) => {
         if (!isMountedRef.current) return;
         safeSetState(setIsConnected, false);
+        wsRef.current = null;
         
         if (event.code === 1008) {
           safeSetState(setError, "Pro subscription required for real-time market data");
@@ -137,14 +141,14 @@ export function useWebSocket({
           return;
         }
 
-        if (reconnectAttempts.current < maxReconnectAttempts && enabled && isMountedRef.current) {
+        if (event.code !== 1000 && reconnectAttempts.current < maxReconnectAttempts && enabled && isMountedRef.current) {
           reconnectAttempts.current++;
           reconnectTimeoutRef.current = setTimeout(() => {
-            if (isMountedRef.current) {
+            if (isMountedRef.current && enabled) {
               connect();
             }
           }, reconnectDelay * reconnectAttempts.current);
-        } else if (isMountedRef.current) {
+        } else if (isMountedRef.current && event.code !== 1000) {
           safeSetState(setError, "Failed to connect to real-time market data");
         }
       };
@@ -152,10 +156,9 @@ export function useWebSocket({
       wsRef.current = ws;
     } catch (error) {
       if (!isMountedRef.current) return;
-      console.error("Error connecting WebSocket:", error);
       safeSetState(setError, "Failed to establish WebSocket connection");
     }
-  }, [enabled, symbols, getAuthToken]);
+  }, [enabled, getAuthToken, safeSetState]);
 
   const handleMessage = useCallback(
     (message: WebSocketMessage) => {
@@ -163,7 +166,11 @@ export function useWebSocket({
       
       switch (message.type) {
         case "connected":
+          safeSetState(setIsConnected, true);
           safeSetState(setIsPro, true);
+          if (symbols.length > 0) {
+            subscribe(symbols);
+          }
           break;
 
         case "quote":

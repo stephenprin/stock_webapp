@@ -14,9 +14,12 @@ import { useRouter } from "next/navigation";
 import { LogOut, Settings, HelpCircle } from "lucide-react";
 import NavItems from "./NavItems";
 import { signOut } from "@/lib/actions/auth.actions";
+import PrioritySupportBadge from "./support/PrioritySupportBadge";
+import { useSubscription } from "@/lib/hooks/useSubscription";
 
 function UserDropdown({ user }: { user: User }) {
   const router = useRouter();
+  const { isPro, isEnterprise, loading: subscriptionLoading } = useSubscription();
 
   const handleSignOut = async () => {
     await signOut();
@@ -74,7 +77,10 @@ function UserDropdown({ user }: { user: User }) {
           className="text-gray-100 text-md font-medium focus:bg-transparent focus:text-yellow-500 transition-colors cursor-pointer"
         >
           <HelpCircle className="h-4 w-4 mr-2 hidden sm:block" />
-          Support
+          <span className="flex-1">Support</span>
+          {!subscriptionLoading && (isPro || isEnterprise) && (
+            <PrioritySupportBadge variant="icon-only" />
+          )}
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={handleSignOut}

@@ -25,7 +25,6 @@ export function RealTimeMarketData({
     symbols,
     enabled: symbols.length > 0,
     onUpdate: (updates) => {
-      console.log("Received market updates:", updates);
     },
   });
 

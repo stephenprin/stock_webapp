@@ -240,6 +240,8 @@ declare global {
         symbol: string;
         companyName: string;
         exchange?: string;
+        sector?: string;
+        industry?: string;
         quantity: number;
         averageCost: number;
         totalCost: number;

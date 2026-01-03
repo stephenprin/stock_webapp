@@ -25,10 +25,22 @@ export class MarketDataWebSocketServer {
   private updateInterval: NodeJS.Timeout | null = null;
   private subscribedSymbols: Set<string> = new Set();
   private lastQuotes: Map<string, MarketUpdate> = new Map();
-  private readonly UPDATE_INTERVAL_MS = 5000;
+  private readonly UPDATE_INTERVAL_MS = 60000;
+  private rateLimitedUntil: number = 0;
 
   start(port: number = 8080) {
-    this.wss = new WebSocketServer({ port });
+    try {
+      this.wss = new WebSocketServer({ port });
+
+      this.wss.on("error", (error: any) => {
+        if (error.code === "EADDRINUSE") {
+          process.exit(1);
+        }
+      });
+
+      this.wss.on("listening", () => {
+        // WebSocket server ready
+      });
 
     this.wss.on("connection", async (ws: WebSocket, req) => {
       const urlString = req.url || "";
@@ -50,7 +62,7 @@ export class MarketDataWebSocketServer {
           ws.close(1008, "Pro subscription required");
           return;
         }
-
+        
         const client: ClientConnection = {
           ws,
           userId,
@@ -65,7 +77,6 @@ export class MarketDataWebSocketServer {
             const message = JSON.parse(data.toString());
             await this.handleMessage(connectionId, message);
           } catch (error) {
-            console.error("Error handling WebSocket message:", error);
             this.sendError(connectionId, "Invalid message format");
           }
         });
@@ -75,8 +86,7 @@ export class MarketDataWebSocketServer {
           this.updateSubscribedSymbols();
         });
 
-        ws.on("error", (error) => {
-          console.error("WebSocket error:", error);
+        ws.on("error", () => {
           this.clients.delete(connectionId);
           this.updateSubscribedSymbols();
         });
@@ -89,21 +99,25 @@ export class MarketDataWebSocketServer {
         this.updateSubscribedSymbols();
         this.startPollingIfNeeded();
       } catch (error) {
-        console.error("Error setting up connection:", error);
         ws.close(1011, "Internal server error");
       }
     });
 
-    console.log(`WebSocket server started on port ${port}`);
+    } catch (error: any) {
+      if (error.code === "EADDRINUSE") {
+        process.exit(1);
+      } else {
+        throw error;
+      }
+    }
   }
 
   private async verifyProUser(userId: string): Promise<boolean> {
     try {
-      const { getUserSubscriptionPlan } = await import("@/lib/actions/user.actions");
-      const plan = await getUserSubscriptionPlan(userId);
+      const { checkUserSubscriptionPlan } = await import("@/lib/services/subscription-check");
+      const plan = await checkUserSubscriptionPlan(userId);
       return plan === "pro" || plan === "enterprise";
     } catch (error) {
-      console.error("Error verifying Pro user:", error);
       return false;
     }
   }
@@ -114,7 +128,9 @@ export class MarketDataWebSocketServer {
 
   private async handleMessage(connectionId: string, message: any) {
     const client = this.clients.get(connectionId);
-    if (!client) return;
+    if (!client) {
+      return;
+    }
 
     switch (message.type) {
       case "subscribe":
@@ -129,13 +145,14 @@ export class MarketDataWebSocketServer {
           });
           this.startPollingIfNeeded();
           
-          const quotes = await this.fetchQuotesForSymbols(
+          // For initial subscription, fetch quotes without checking lastQuotes (force send)
+          const initialQuotes = await this.fetchQuotesForSymbolsForced(
             Array.from(client.subscribedSymbols)
           );
-          if (quotes.length > 0) {
+          if (initialQuotes.length > 0) {
             this.send(connectionId, {
               type: "quote",
-              data: quotes,
+              data: initialQuotes,
             });
           }
         }
@@ -203,29 +220,66 @@ export class MarketDataWebSocketServer {
   private async fetchQuotesForSymbols(
     symbols: string[]
   ): Promise<MarketUpdate[]> {
-    const { getStockQuote } = await import("@/lib/actions/finnhub.actions");
+    const apiKey = process.env.FINNHUB_API_KEY || process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+    if (!apiKey) {
+      return [];
+    }
+    
+    const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
+    
     const quotes = await Promise.allSettled(
       symbols.map(async (symbol) => {
-        const quote = await getStockQuote(symbol);
-        if (!quote) return null;
-
-        return {
-          symbol,
-          currentPrice: quote.currentPrice,
-          change: quote.change,
-          changePercent: quote.changePercent,
-          previousClose: quote.previousClose,
-          high: quote.high,
-          low: quote.low,
-          open: quote.open,
-          timestamp: Date.now(),
-        } as MarketUpdate;
+        try {
+          const cleanSymbol = symbol.trim().toUpperCase();
+          const url = `${FINNHUB_BASE_URL}/quote?symbol=${encodeURIComponent(cleanSymbol)}&token=${apiKey}`;
+          
+          const response = await fetch(url);
+          
+          if (!response.ok) {
+            const text = await response.text().catch(() => '');
+            
+            if (response.status === 429) {
+              this.rateLimitedUntil = Date.now() + 60000;
+              throw new Error(`Rate limited: ${text}`);
+            }
+            
+            throw new Error(`Finnhub API error ${response.status}: ${text}`);
+          }
+          
+          const data = await response.json() as {
+            c?: number;
+            d?: number;
+            dp?: number;
+            h?: number;
+            l?: number;
+            o?: number;
+            pc?: number;
+          };
+          
+          if (!data || typeof data.c !== 'number' || data.c <= 0) {
+            return null;
+          }
+          
+          return {
+            symbol: cleanSymbol,
+            currentPrice: data.c,
+            change: data.d || 0,
+            changePercent: data.dp || 0,
+            previousClose: data.pc || data.c,
+            high: data.h || data.c,
+            low: data.l || data.c,
+            open: data.o || data.c,
+            timestamp: Date.now(),
+          } as MarketUpdate;
+        } catch (error) {
+          return null;
+        }
       })
     );
 
     const updates: MarketUpdate[] = [];
 
-    quotes.forEach((result) => {
+    quotes.forEach((result, index) => {
       if (result.status === "fulfilled" && result.value) {
         const update = result.value;
         const lastUpdate = this.lastQuotes.get(update.symbol);
@@ -245,6 +299,81 @@ export class MarketDataWebSocketServer {
     return updates;
   }
 
+  private async fetchQuotesForSymbolsForced(
+    symbols: string[]
+  ): Promise<MarketUpdate[]> {
+    
+    const apiKey = process.env.FINNHUB_API_KEY || process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+    if (!apiKey) {
+      return [];
+    }
+    
+    const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
+    
+    const quotes = await Promise.allSettled(
+      symbols.map(async (symbol) => {
+        try {
+          const cleanSymbol = symbol.trim().toUpperCase();
+          const url = `${FINNHUB_BASE_URL}/quote?symbol=${encodeURIComponent(cleanSymbol)}&token=${apiKey}`;
+          
+          const response = await fetch(url);
+          
+          if (!response.ok) {
+            const text = await response.text().catch(() => '');
+            
+            if (response.status === 429) {
+              this.rateLimitedUntil = Date.now() + 60000;
+              throw new Error(`Rate limited: ${text}`);
+            }
+            
+            throw new Error(`Finnhub API error ${response.status}: ${text}`);
+          }
+          
+          const data = await response.json() as {
+            c?: number;
+            d?: number;
+            dp?: number;
+            h?: number;
+            l?: number;
+            o?: number;
+            pc?: number;
+          };
+          
+          if (!data || typeof data.c !== 'number' || data.c <= 0) {
+            return null;
+          }
+          
+          const update: MarketUpdate = {
+            symbol: cleanSymbol,
+            currentPrice: data.c,
+            change: data.d || 0,
+            changePercent: data.dp || 0,
+            previousClose: data.pc || data.c,
+            high: data.h || data.c,
+            low: data.l || data.c,
+            open: data.o || data.c,
+            timestamp: Date.now(),
+          };
+          this.lastQuotes.set(cleanSymbol, update);
+          
+          return update;
+        } catch (error) {
+          return null;
+        }
+      })
+    );
+
+    const updates: MarketUpdate[] = [];
+
+    quotes.forEach((result) => {
+      if (result.status === "fulfilled" && result.value) {
+        updates.push(result.value);
+      }
+    });
+
+    return updates;
+  }
+
   private send(connectionId: string, message: any) {
     const client = this.clients.get(connectionId);
     if (!client || client.ws.readyState !== WebSocket.OPEN) {
@@ -254,7 +383,6 @@ export class MarketDataWebSocketServer {
     try {
       client.ws.send(JSON.stringify(message));
     } catch (error) {
-      console.error("Error sending message:", error);
       this.clients.delete(connectionId);
     }
   }

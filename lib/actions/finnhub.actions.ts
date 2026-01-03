@@ -46,7 +46,6 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
             const articles = await fetchJSON<RawNewsArticle[]>(url, 300);
             perSymbolArticles[sym] = (articles || []).filter(validateArticle);
           } catch (e) {
-            console.error('Error fetching company news for', sym, e);
             perSymbolArticles[sym] = [];
           }
         })
@@ -93,7 +92,6 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
     const formatted = unique.slice(0, maxArticles).map((a, idx) => formatArticle(a, false, undefined, idx));
     return formatted;
   } catch (err) {
-    console.error('getNews error:', err);
     throw new Error('Failed to fetch news');
   }
 }
@@ -102,7 +100,6 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
   try {
     const token = process.env.FINNHUB_API_KEY ?? NEXT_PUBLIC_FINNHUB_API_KEY;
     if (!token) {
-      console.error('Error in stock search:', new Error('FINNHUB API key is not configured'));
       return [];
     }
 
@@ -121,7 +118,6 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
             const profile = await fetchJSON<any>(url, 3600);
             return { sym, profile } as { sym: string; profile: any };
           } catch (e) {
-            console.error('Error fetching profile2 for', sym, e);
             return { sym, profile: null } as { sym: string; profile: any };
           }
         })
@@ -173,7 +169,6 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
 
     return mapped;
   } catch (err) {
-    console.error('Error in stock search:', err);
     return [];
   }
 });
@@ -190,7 +185,6 @@ export async function getStockQuote(symbol: string): Promise<{
   try {
     const token = process.env.FINNHUB_API_KEY ?? NEXT_PUBLIC_FINNHUB_API_KEY;
     if (!token) {
-      console.error('FINNHUB API key is not configured');
       return null;
     }
 
@@ -209,7 +203,8 @@ export async function getStockQuote(symbol: string): Promise<{
       t?: number; 
     }>(url, 60);
 
-    if (!data || typeof data.c !== 'number') {
+    // Check if data is valid - c (current price) should be a valid number > 0
+    if (!data || typeof data.c !== 'number' || data.c <= 0) {
       return null;
     }
 
@@ -223,7 +218,6 @@ export async function getStockQuote(symbol: string): Promise<{
       open: data.o || data.c,
     };
   } catch (err) {
-    console.error('Error fetching stock quote for', symbol, err);
     return null;
   }
 }
@@ -276,7 +270,6 @@ export async function getCompanyProfile(symbol: string): Promise<{
   try {
     const token = process.env.FINNHUB_API_KEY ?? NEXT_PUBLIC_FINNHUB_API_KEY;
     if (!token) {
-      console.error('FINNHUB API key is not configured');
       return null;
     }
 
@@ -306,7 +299,6 @@ export async function getCompanyProfile(symbol: string): Promise<{
       finnhubIndustry: data.finnhubIndustry,
     };
   } catch (err) {
-    console.error('Error fetching company profile for', symbol, err);
     return null;
   }
 }

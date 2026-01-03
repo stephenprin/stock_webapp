@@ -76,7 +76,6 @@ export default function SellPositionDialog({
         toast.error("Could not fetch price for this symbol");
       }
     } catch (error) {
-      console.error("Error fetching price:", error);
       toast.error("Failed to fetch price");
     } finally {
       setFetchingPrice(false);
@@ -113,7 +112,6 @@ export default function SellPositionDialog({
         toast.error(result.error || "Failed to sell shares");
       }
     } catch (error) {
-      console.error("Error selling position:", error);
       toast.error("Failed to sell shares");
     } finally {
       setLoading(false);

@@ -1,6 +1,8 @@
 "use client";
 
 import { useCustomer } from "autumn-js/react";
+import { useEffect, useRef } from "react";
+import { syncSubscriptionToDatabase } from "@/lib/actions/subscription.actions";
 
 const PLAN_PRODUCT_IDS = {
   pro: "pro_plan",
@@ -14,6 +16,7 @@ const PRODUCT_ID_TO_PLAN = {
 
 export function useSubscription() {
   const { customer, attach, check, track, cancel, openBillingPortal, isLoading, error } = useCustomer();
+  const lastSyncedPlan = useRef<string | null>(null);
 
   const getPlanFromCustomer = (): SubscriptionPlan => {
     if (!customer?.products || customer.products.length === 0) {
@@ -43,6 +46,31 @@ export function useSubscription() {
   };
 
   const plan: SubscriptionPlan = getPlanFromCustomer();
+  
+  // Sync subscription to local database when it changes
+  useEffect(() => {
+    if (!customer || isLoading) return;
+    
+    const currentPlan = plan;
+    const currentPlanKey = `${currentPlan}-${customer.id || ""}`;
+    
+    // Only sync if plan changed
+    if (lastSyncedPlan.current !== currentPlanKey && customer.id) {
+      lastSyncedPlan.current = currentPlanKey;
+      
+      // Get the active product
+      const isActive = (status: string) => status === "active" || status === "trialing";
+      const activeProduct = customer.products?.find((p: any) => isActive(p.status));
+      
+      // Sync to database in the background
+      syncSubscriptionToDatabase(
+        customer.id,
+        currentPlan,
+        activeProduct?.id,
+        customer.id
+      ).catch(() => {});
+    }
+  }, [plan, customer, isLoading]);
   
   return {
     plan,

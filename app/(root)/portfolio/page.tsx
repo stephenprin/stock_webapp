@@ -12,6 +12,7 @@ import PortfolioHoldingsTable from "@/components/portfolio/PortfolioHoldingsTabl
 import AddPositionDialog from "@/components/portfolio/AddPositionDialog";
 import AssetAllocationChart from "@/components/portfolio/AssetAllocationChart";
 import PortfolioPerformanceChart from "@/components/portfolio/PortfolioPerformanceChart";
+import EnhancedPortfolioAnalytics from "@/components/portfolio/EnhancedPortfolioAnalytics";
 import SubscriptionBadge from "@/components/billing/SubscriptionBadge";
 import UpgradeDialog from "@/components/billing/UpgradeDialog";
 import { useSubscription } from "@/lib/hooks/useSubscription";
@@ -67,7 +68,6 @@ export default function PortfolioPage() {
         toast.error(result.error || "Failed to load portfolio");
       }
     } catch (error) {
-      console.error("Error loading portfolio:", error);
       toast.error("Failed to load portfolio");
     } finally {
       setLoading(false);
@@ -339,6 +339,11 @@ export default function PortfolioPage() {
           </CardContent>
         </Card>
       </div>
+      )}
+
+      {/* Enhanced Analytics - Pro Only */}
+      {summary && holdings.length > 0 && (
+        <EnhancedPortfolioAnalytics holdings={holdings} summary={summary} />
       )}
 
       {/* Holdings Table */}
