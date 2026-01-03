@@ -9,10 +9,13 @@ import TradingViewWidget from "@/components/TradingViewWidget";
 import { CANDLE_CHART_WIDGET_CONFIG, SYMBOL_INFO_WIDGET_CONFIG } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, TrendingUp, TrendingDown, ExternalLink, Plus, Building2, Globe, BarChart3, Bell } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, ExternalLink, Plus, Building2, Globe, BarChart3, Bell, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import AddPositionDialog from "@/components/portfolio/AddPositionDialog";
 import CreateAlertDialog from "@/components/alerts/CreateAlertDialog";
+import UpgradeDialog from "@/components/billing/UpgradeDialog";
+import { useSubscription } from "@/lib/hooks/useSubscription";
+import { getSubscriptionLimits } from "@/lib/utils/subscription";
 import { formatCurrency, formatPercent } from "@/lib/utils/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -28,6 +31,11 @@ export default function SearchPage() {
   const [inPortfolio, setInPortfolio] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [createAlertDialogOpen, setCreateAlertDialogOpen] = useState(false);
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<string>();
+  
+  const { plan, isFree } = useSubscription();
+  const [stockLimit, setStockLimit] = useState<number | null>(null);
 
   useEffect(() => {
     if (!symbol) {
@@ -37,6 +45,17 @@ export default function SearchPage() {
 
     loadStockData();
   }, [symbol]);
+
+  useEffect(() => {
+    const fetchLimits = async () => {
+      const limits = await getSubscriptionLimits(plan);
+      setStockLimit(limits.maxStocks);
+      setAlertLimit(limits.maxAlerts);
+    };
+    if (plan) {
+      fetchLimits();
+    }
+  }, [plan]);
 
   const loadStockData = async () => {
     if (!symbol) return;
@@ -51,13 +70,30 @@ export default function SearchPage() {
       ]);
 
       if (!quoteData) {
-        toast.error(`Could not find data for symbol: ${symbol}`);
+        toast.error(`Could not find data for symbol: ${symbol}. Please check if the symbol is correct.`);
+        setLoading(false);
         router.push("/dashboard");
         return;
       }
 
+      if (!quoteData.currentPrice || quoteData.currentPrice === 0) {
+        toast.error(`Could not find valid price data for symbol: ${symbol}. The symbol may be invalid or not available.`);
+        setLoading(false);
+        router.push("/dashboard");
+        return;
+      }
+
+      // Set quote data (required)
       setQuote(quoteData);
-      setProfile(profileData);
+      
+      // Set profile data (optional - might be null for some symbols)
+      if (profileData && Object.keys(profileData).length > 0) {
+        setProfile(profileData);
+      } else {
+        setProfile(null);
+      }
+      
+      // Set news data
       setNews(newsData || []);
 
       if (portfolioData.success && portfolioData.holdings) {
@@ -67,7 +103,6 @@ export default function SearchPage() {
         setInPortfolio(isInPortfolio);
       }
     } catch (error) {
-      console.error("Error loading stock data:", error);
       toast.error("Failed to load stock data");
     } finally {
       setLoading(false);
@@ -195,13 +230,68 @@ export default function SearchPage() {
   }
 
   if (!quote || !symbol) {
-    return null;
+    // Show error state instead of null
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold text-white mb-4">Invalid Symbol</h2>
+          <p className="text-gray-400 mb-6">
+            Could not load data for {symbol}. The symbol may be invalid or not available.
+          </p>
+          <Button
+            onClick={() => router.push("/dashboard")}
+            className="bg-yellow-500 hover:bg-yellow-600 text-gray-900"
+          >
+            Go to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   const isPositive = quote.change >= 0;
-  const tradingViewSymbol = profile?.exchange 
-    ? `${profile.exchange}:${symbol}`
-    : symbol;
+  
+  // Construct TradingView symbol - TradingView requires EXCHANGE:SYMBOL format
+  const getTradingViewSymbol = (sym: string, profileData: any): string => {
+    if (profileData?.exchange) {
+      const exchange = profileData.exchange.toUpperCase().trim();
+      
+      // Map common exchange formats to TradingView format
+      // Handle "NASDAQ NMS - GLOBAL MARKET" format
+      if (exchange.includes("NASDAQ") || exchange === "NMS" || exchange === "NCM" || exchange === "NGM") {
+        return `NASDAQ:${sym}`;
+      }
+      if (exchange.includes("NYSE") || exchange === "NYQ") {
+        return `NYSE:${sym}`;
+      }
+      if (exchange.includes("AMEX") || exchange === "ASE") {
+        return `AMEX:${sym}`;
+      }
+      // For other exchanges, try to use the exchange code directly
+      // Some common mappings
+      const exchangeMap: Record<string, string> = {
+        "OTC": "OTC",
+        "LSE": "LSE",
+        "TSX": "TSX",
+        "TSE": "TSE",
+      };
+      
+      for (const [key, value] of Object.entries(exchangeMap)) {
+        if (exchange.includes(key)) {
+          return `${value}:${sym}`;
+        }
+      }
+      
+      // Fallback: try using exchange name directly (might work for some)
+      return `${exchange}:${sym}`;
+    }
+    
+    // Default fallback: try NASDAQ first (most common for tech stocks like NVDA)
+    // If that doesn't work, TradingView will show an error
+    return `NASDAQ:${sym}`;
+  };
+  
+  const tradingViewSymbol = getTradingViewSymbol(symbol, profile);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -387,7 +477,20 @@ export default function SearchPage() {
                   <div>
                     <p className="text-sm text-gray-400 mb-1">Market Cap</p>
                     <p className="text-lg font-semibold text-white">
-                      ${(profile.marketCapitalization / 1e9).toFixed(2)}B
+                      {(() => {
+                        const marketCap = profile.marketCapitalization;
+                        // Finnhub returns market cap in the base currency unit (dollars)
+                        // Format appropriately based on size
+                        if (marketCap >= 1e12) {
+                          return `$${(marketCap / 1e12).toFixed(2)}T`;
+                        } else if (marketCap >= 1e9) {
+                          return `$${(marketCap / 1e9).toFixed(2)}B`;
+                        } else if (marketCap >= 1e6) {
+                          return `$${(marketCap / 1e6).toFixed(2)}M`;
+                        } else {
+                          return `$${marketCap.toLocaleString()}`;
+                        }
+                      })()}
                     </p>
                   </div>
                 )}
@@ -502,6 +605,13 @@ export default function SearchPage() {
         }}
         defaultSymbol={symbol}
         defaultCompany={profile?.name || ""}
+      />
+      
+      <UpgradeDialog
+        open={upgradeDialogOpen}
+        onOpenChange={setUpgradeDialogOpen}
+        targetPlan="pro"
+        reason={upgradeReason}
       />
     </div>
   );

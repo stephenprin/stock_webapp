@@ -422,7 +422,6 @@ export async function evaluateAlert(
         };
     }
   } catch (error) {
-    console.error(`Error evaluating alert for ${symbol}:`, error);
     return {
       shouldTrigger: false,
       reason: `Evaluation error: ${error instanceof Error ? error.message : "Unknown error"}`,

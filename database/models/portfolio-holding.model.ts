@@ -5,6 +5,8 @@ export interface PortfolioHolding extends Document {
   symbol: string;
   companyName: string;
   exchange?: string;
+  sector?: string;
+  industry?: string;
   quantity: number;
   averageCost: number; 
   totalCost: number; 
@@ -24,6 +26,8 @@ const PortfolioHoldingSchema = new Schema<PortfolioHolding>(
     symbol: { type: String, required: true, uppercase: true, trim: true },
     companyName: { type: String, required: true, trim: true },
     exchange: { type: String, trim: true },
+    sector: { type: String, trim: true, index: true },
+    industry: { type: String, trim: true },
     quantity: { type: Number, required: true, min: 0 },
     averageCost: { type: Number, required: true, min: 0 },
     totalCost: { type: Number, required: true, min: 0 },

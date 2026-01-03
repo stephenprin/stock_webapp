@@ -4,6 +4,8 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import FAQSection, { type FAQItem } from "@/components/support/FAQSection";
+import PrioritySupportBadge from "@/components/support/PrioritySupportBadge";
+import { useSubscription } from "@/lib/hooks/useSubscription";
 import {
   HelpCircle,
   UserPlus,
@@ -17,6 +19,8 @@ import {
   Mail,
   Lock,
   X,
+  Zap,
+  HeadphonesIcon,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -531,6 +535,7 @@ const extractTextFromNode = (node: React.ReactNode): string => {
 export default function SupportPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const { isPro, isEnterprise, loading: subscriptionLoading } = useSubscription();
 
   const filteredCategories = useMemo(() => {
     return faqCategories
@@ -578,6 +583,25 @@ export default function SupportPage() {
           <p className="text-lg sm:text-xl text-gray-400 mb-6 sm:mb-8 px-4">
             Find answers to common questions and learn how to make the most of Stock Tracker
           </p>
+          
+          {/* Priority Support Indicator */}
+          {!subscriptionLoading && (isPro || isEnterprise) && (
+            <div className="flex items-center justify-center mb-4">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg">
+                {isEnterprise ? (
+                  <HeadphonesIcon className="h-4 w-4 text-purple-400" />
+                ) : (
+                  <Zap className="h-4 w-4 text-yellow-400" />
+                )}
+                <span className="text-sm text-gray-300">
+                  {isEnterprise ? "Dedicated Support" : "Priority Support"} Active
+                </span>
+                <span className="text-xs text-gray-500">
+                  {isEnterprise ? "• Direct access to our team" : "• Faster response times"}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Search */}
           <div className="max-w-2xl mx-auto mb-6 sm:mb-8 px-4">
@@ -696,22 +720,53 @@ export default function SupportPage() {
         {/* Still Need Help Section */}
         <Card className="mt-8 sm:mt-12 bg-gray-800 border-gray-700">
           <CardHeader className="px-4 sm:px-6">
-            <CardTitle className="text-white text-lg sm:text-xl">Still Need Help?</CardTitle>
-            <CardDescription className="text-gray-400 text-sm sm:text-base">
-              Can't find what you're looking for?
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-white text-lg sm:text-xl">Still Need Help?</CardTitle>
+                <CardDescription className="text-gray-400 text-sm sm:text-base">
+                  Can't find what you're looking for?
+                </CardDescription>
+              </div>
+              {!subscriptionLoading && (isPro || isEnterprise) && (
+                <PrioritySupportBadge variant="compact" />
+              )}
+            </div>
           </CardHeader>
           <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
             <div className="space-y-3 sm:space-y-4">
-              <p className="text-gray-300 text-sm sm:text-base leading-relaxed">
-                If you're a <strong className="text-white">Pro</strong> or{" "}
-                <strong className="text-white">Enterprise</strong> subscriber, you have access to
-                priority support. Check your account settings for contact information.
-              </p>
-              <p className="text-gray-300 text-sm sm:text-base leading-relaxed">
-                Free plan users can find additional help in our documentation and community
-                resources.
-              </p>
+              {isPro || isEnterprise ? (
+                <div className="rounded-lg bg-gradient-to-r from-gray-700/50 to-gray-800/50 border border-gray-600 p-4">
+                  <div className="flex items-start gap-3">
+                    {isEnterprise ? (
+                      <HeadphonesIcon className="h-5 w-5 text-purple-400 mt-0.5 shrink-0" />
+                    ) : (
+                      <Zap className="h-5 w-5 text-yellow-400 mt-0.5 shrink-0" />
+                    )}
+                    <div className="flex-1">
+                      <h4 className="text-white font-semibold mb-1">
+                        {isEnterprise ? "Dedicated Support Available" : "Priority Support Available"}
+                      </h4>
+                      <p className="text-gray-300 text-sm leading-relaxed mb-2">
+                        {isEnterprise
+                          ? "As an Enterprise subscriber, you have direct access to our dedicated support team. Check your account settings or email us directly for immediate assistance."
+                          : "As a Pro subscriber, you have priority support with faster response times. Check your account settings for contact information."}
+                      </p>
+                      <Link
+                        href="/settings"
+                        className="inline-flex items-center text-sm text-yellow-500 hover:text-yellow-400 font-medium transition-colors"
+                      >
+                        Go to Settings →
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-gray-300 text-sm sm:text-base leading-relaxed">
+                  Free plan users can find additional help in our documentation and community
+                  resources. Upgrade to <strong className="text-white">Pro</strong> or{" "}
+                  <strong className="text-white">Enterprise</strong> for priority support with faster response times.
+                </p>
+              )}
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4">
                 <Link
                   href="/dashboard"
@@ -719,12 +774,14 @@ export default function SupportPage() {
                 >
                   Go to Dashboard
                 </Link>
-                <Link
-                  href="/sign-in"
-                  className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors border border-gray-600 text-center text-sm sm:text-base"
-                >
-                  Sign In
-                </Link>
+                {!isPro && !isEnterprise && (
+                  <Link
+                    href="/settings"
+                    className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-medium rounded-lg transition-colors text-center text-sm sm:text-base"
+                  >
+                    Upgrade for Priority Support
+                  </Link>
+                )}
               </div>
             </div>
           </CardContent>

@@ -5,27 +5,69 @@ import { auth, getAuth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { formatPhoneNumber, validatePhoneNumber } from "@/lib/services/sms.service";
 import { ObjectId } from "mongodb";
+import { UserSubscriptionModel, type SubscriptionPlan } from "@/database/models/user-subscription.model";
+
+export async function saveUserSubscriptionPlan(
+  userId: string,
+  plan: SubscriptionPlan,
+  productId?: string,
+  customerId?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await connectToDatabase();
+    
+    await UserSubscriptionModel.findOneAndUpdate(
+      { userId },
+      {
+        userId,
+        plan,
+        productId,
+        customerId,
+        lastSyncedAt: new Date(),
+      },
+      {
+        upsert: true,
+        new: true,
+      }
+    );
+    
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to save subscription plan",
+    };
+  }
+}
 
 export async function getUserSubscriptionPlan(userId: string, userEmail?: string): Promise<"free" | "pro" | "enterprise"> {
     try {
+        // First, check local database cache
+        await connectToDatabase();
+        const localSubscription = await UserSubscriptionModel.findOne({ userId }).lean();
+        
+        if (localSubscription && localSubscription.plan !== "free") {
+            return localSubscription.plan;
+        }
         const mongoose = await connectToDatabase();
         const db = mongoose.connection.db;
         
         if (!db) {
-            console.error("[Subscription] Database connection not found");
             return "free";
         }
-
         const queryConditions: any[] = [
             { userId: userId },
             { "user.id": userId },
-            { "user._id": userId }
+            { "user._id": userId },
+            { "user._id": new (await import("mongodb")).ObjectId(userId) },
         ];
 
         if (userEmail) {
             queryConditions.push(
                 { "user.email": userEmail.toLowerCase() },
-                { email: userEmail.toLowerCase() }
+                { "user.email": userEmail },
+                { email: userEmail.toLowerCase() },
+                { email: userEmail }
             );
         }
 
@@ -34,67 +76,87 @@ export async function getUserSubscriptionPlan(userId: string, userEmail?: string
         });
 
         if (!customer) {
-            console.log(`[Subscription] No customer found for userId: ${userId}${userEmail ? `, email: ${userEmail}` : ""}`);
+            const allCustomers = await db.collection("autumn_customers").find({}).toArray();
             
-            const allCustomers = await db.collection("autumn_customers").find({}).limit(5).toArray();
-            console.log(`[Subscription] Sample customer records:`, allCustomers.map((c: any) => ({
-                id: c._id,
-                userId: c.userId,
-                user: c.user,
-                hasProducts: !!c.products,
-                productCount: c.products?.length || 0
-            })));
+            const alternativeCustomer = allCustomers.find((c: any) => {
+                if (c.userId === userId) return true;
+                if (c.user?.id === userId) return true;
+                if (c.user?._id?.toString() === userId) return true;
+                if (userEmail && (c.user?.email?.toLowerCase() === userEmail.toLowerCase() || c.email?.toLowerCase() === userEmail.toLowerCase())) return true;
+                return false;
+            });
             
+            if (alternativeCustomer) {
+                return await checkCustomerProducts(alternativeCustomer, userId);
+            }
+            
+            await saveUserSubscriptionPlan(userId, "free");
             return "free";
         }
 
+        return await checkCustomerProducts(customer, userId);
+    } catch (error) {
+        return "free";
+    }
+}
+
+async function checkCustomerProducts(customer: any, userId: string): Promise<"free" | "pro" | "enterprise"> {
+    try {
         if (!customer.products || customer.products.length === 0) {
-            console.log(`[Subscription] Customer found but no products for userId: ${userId}`);
             return "free";
         }
 
         const isActive = (status: string) => status === "active" || status === "trialing";
 
-        console.log(`[Subscription] Checking products for userId: ${userId}`, {
-            customerId: customer._id,
-            products: customer.products.map((p: any) => ({ 
-                id: p.id, 
-                productId: p.productId,
-                status: p.status,
-                name: p.name
-            }))
-        });
-
         const hasEnterprise = customer.products.some((p: any) => {
-            const productId = p.id || p.productId || p.name;
+            const productId = p.id;
             const status = p.status;
+            const productIdAlt = p.productId || p.name;
+            const productIdLower = String(productId || productIdAlt || "").toLowerCase();
             const matches = (productId === "enterprise_plan" || 
                           productId === "enterprise" || 
-                          productId?.toLowerCase() === "enterprise");
-            return matches && isActive(status);
+                          productIdAlt === "enterprise_plan" ||
+                          productIdAlt === "enterprise" ||
+                          productIdLower === "enterprise" ||
+                          productIdLower.includes("enterprise"));
+            const active = isActive(status);
+            return matches && active;
         });
+        
         if (hasEnterprise) {
-            console.log(`[Subscription] Enterprise subscription found for userId: ${userId}`);
+            const enterpriseProduct = customer.products.find((p: any) => 
+                (p.id === "enterprise_plan" || p.id === "enterprise") && isActive(p.status)
+            );
+            await saveUserSubscriptionPlan(userId, "enterprise", enterpriseProduct?.id, customer.userId || customer._id?.toString());
             return "enterprise";
         }
 
         const hasPro = customer.products.some((p: any) => {
-            const productId = p.id || p.productId || p.name;
+            const productId = p.id;
             const status = p.status;
+            const productIdAlt = p.productId || p.name;
+            const productIdLower = String(productId || productIdAlt || "").toLowerCase();
             const matches = (productId === "pro_plan" || 
                           productId === "pro" || 
-                          productId?.toLowerCase() === "pro");
-            return matches && isActive(status);
+                          productIdAlt === "pro_plan" ||
+                          productIdAlt === "pro" ||
+                          productIdLower === "pro" ||
+                          productIdLower.includes("pro"));
+            const active = isActive(status);
+            return matches && active;
         });
+        
         if (hasPro) {
-            console.log(`[Subscription] Pro subscription found for userId: ${userId}`);
+            const proProduct = customer.products.find((p: any) => 
+                (p.id === "pro_plan" || p.id === "pro") && isActive(p.status)
+            );
+            await saveUserSubscriptionPlan(userId, "pro", proProduct?.id, customer.userId || customer._id?.toString());
             return "pro";
         }
 
-        console.log(`[Subscription] No active Pro/Enterprise subscription for userId: ${userId}`);
+        await saveUserSubscriptionPlan(userId, "free");
         return "free";
     } catch (error) {
-        console.error("Error getting user subscription plan:", error);
         return "free";
     }
 }
@@ -112,7 +174,6 @@ export async function getPortfolioSymbolsByUserId(userId: string): Promise<strin
 
         return holdings.map((h) => String(h.symbol));
     } catch (error) {
-        console.error("Error fetching portfolio symbols:", error);
         return [];
     }
 }
@@ -166,7 +227,6 @@ export async function getUserPhoneNumber(): Promise<{
     }
 
     if (!user) {
-      console.error(`[User Actions] User not found with id: ${session.user.id}`);
       return {
         success: false,
         error: "User not found",
@@ -179,7 +239,6 @@ export async function getUserPhoneNumber(): Promise<{
       smsNotificationsEnabled: user?.smsNotificationsEnabled !== false,
     };
   } catch (error) {
-    console.error("Error fetching user phone number:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to fetch phone number",
@@ -262,7 +321,6 @@ export async function updateUserPhoneNumber(phoneNumber: string): Promise<{
     const userEmail = session.user.email;
     
     if (!userEmail) {
-      console.error(`[User Actions] No email found in session for user id: ${userId}`);
       return {
         success: false,
         error: "User email not found",
@@ -284,7 +342,6 @@ export async function updateUserPhoneNumber(phoneNumber: string): Promise<{
     }
 
     if (!userCheck) {
-      console.error(`[User Actions] User not found with email: ${userEmail} or id: ${userId}`);
       return {
         success: false,
         error: "User not found in database",
@@ -297,7 +354,6 @@ export async function updateUserPhoneNumber(phoneNumber: string): Promise<{
     );
 
     if (updateResult.matchedCount === 0) {
-      console.error(`[User Actions] Failed to update phone number for user _id:`, userCheck._id);
       return {
         success: false,
         error: "Failed to update phone number",
@@ -342,7 +398,6 @@ export async function getAllUsersForNewsEmail(): Promise<Array<{
             preferredIndustry: user.preferredIndustry,
         }))
     } catch (e) {
-        console.error('Error fetching users for news email:', e)
         return []
     }
 }
@@ -416,7 +471,6 @@ export async function updateSMSNotificationsEnabled(enabled: boolean): Promise<{
       success: true,
     };
   } catch (error) {
-    console.error("Error updating SMS notification preference:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to update SMS notification preference",

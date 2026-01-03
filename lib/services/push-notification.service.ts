@@ -6,9 +6,6 @@ const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
 const vapidSubject = process.env.VAPID_SUBJECT || "mailto:stephenprince427@gmail.com";
 
 if (!vapidPublicKey || !vapidPrivateKey) {
-  console.warn(
-    "VAPID keys are not set. Push notifications will not work. Please set NEXT_PUBLIC_VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY in your environment variables."
-  );
 } else {
   webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
 }
@@ -60,7 +57,6 @@ export async function sendPushNotification(
 
     return { success: true };
   } catch (error) {
-    console.error("Error sending push notification:", error);
 
  
     if (error instanceof Error) {

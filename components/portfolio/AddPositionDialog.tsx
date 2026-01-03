@@ -93,7 +93,6 @@ export default function AddPositionDialog({
           setSuggestionsOpen(false);
         }
       } catch (error) {
-        console.error("Error searching stocks:", error);
         setSuggestions([]);
         setSuggestionsOpen(false);
       } finally {
@@ -126,7 +125,6 @@ export default function AddPositionDialog({
             setValue("price", quote.currentPrice);
           }
         } catch (error) {
-          console.error("Error fetching price:", error);
         } finally {
           setFetchingPrice(false);
         }
@@ -191,7 +189,6 @@ export default function AddPositionDialog({
         }
       }
     } catch (error) {
-      console.error("Error adding position:", error);
       toast.error("Failed to add position");
     } finally {
       setLoading(false);

@@ -5,7 +5,7 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { PortfolioHoldingModel } from "@/database/models/portfolio-holding.model";
 import { PortfolioTransactionModel, type TransactionType } from "@/database/models/portfolio-transaction.model";
-import { getStockQuote, getStockQuotesBatch } from "./finnhub.actions";
+import { getStockQuote, getStockQuotesBatch, getCompanyProfile } from "./finnhub.actions";
 import {
   calculatePortfolioSummary,
   calculateAssetAllocation,
@@ -91,7 +91,7 @@ export async function getPortfolioHoldings(): Promise<{
           },
         },
       }))
-    ).catch((err) => console.error("Error updating holdings prices:", err));
+    ).catch(() => {});
 
     const summary = calculatePortfolioSummary(updatedHoldings as any);
 
@@ -101,7 +101,6 @@ export async function getPortfolioHoldings(): Promise<{
       summary,
     };
   } catch (error: any) {
-    console.error("Error fetching portfolio holdings:", error);
     return {
       success: false,
       error: error.message || "Failed to fetch portfolio holdings",
@@ -195,6 +194,17 @@ export async function addPosition(data: {
           : 0;
       existingHolding.lastUpdated = new Date();
 
+      // Update sector/industry if not already set (for existing holdings)
+      if (!existingHolding.sector || !existingHolding.industry) {
+        const companyProfile = await getCompanyProfile(data.symbol);
+        if (companyProfile?.sector) {
+          existingHolding.sector = companyProfile.sector;
+        }
+        if (companyProfile?.industry || companyProfile?.finnhubIndustry) {
+          existingHolding.industry = companyProfile.industry || companyProfile.finnhubIndustry;
+        }
+      }
+
       if (data.notes) {
         existingHolding.notes = data.notes;
       }
@@ -207,11 +217,16 @@ export async function addPosition(data: {
       const gainLoss = marketValue - totalCost;
       const gainLossPercent = totalCost > 0 ? (gainLoss / totalCost) * 100 : 0;
 
+      // Fetch company profile to get sector and industry
+      const companyProfile = await getCompanyProfile(data.symbol);
+      
       const newHolding = new PortfolioHoldingModel({
         userId,
         symbol: data.symbol.toUpperCase(),
         companyName: data.companyName,
-        exchange: data.exchange,
+        exchange: data.exchange || companyProfile?.exchange,
+        sector: companyProfile?.sector || undefined,
+        industry: companyProfile?.industry || companyProfile?.finnhubIndustry || undefined,
         quantity: data.quantity,
         averageCost: data.price,
         totalCost,
@@ -246,7 +261,6 @@ export async function addPosition(data: {
       message: `Successfully added ${data.quantity} shares of ${data.symbol.toUpperCase()}`,
     };
   } catch (error: any) {
-    console.error("Error adding position:", error);
     return {
       success: false,
       error: error.message || "Failed to add position",
@@ -349,10 +363,89 @@ export async function sellPosition(data: {
       message: `Sold ${data.quantity} shares of ${data.symbol.toUpperCase()}. ${realizedGainLoss >= 0 ? "Gain" : "Loss"}: ${realizedGainLoss >= 0 ? "+" : ""}${realizedGainLoss.toFixed(2)}`,
     };
   } catch (error: any) {
-    console.error("Error selling position:", error);
     return {
       success: false,
       error: error.message || "Failed to sell position",
+    };
+  }
+}
+
+export async function updatePosition(data: {
+  holdingId: string;
+  quantity: number;
+  averageCost: number;
+  notes?: string;
+}): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    
+    if (!session?.user) {
+      return {
+        success: false,
+        error: "You must be logged in to update positions",
+      };
+    }
+
+    await connectToDatabase();
+    const userId = session.user.id;
+
+    if (data.quantity <= 0 || data.averageCost <= 0) {
+      return {
+        success: false,
+        error: "Quantity and average cost must be greater than 0",
+      };
+    }
+
+    const holding = await PortfolioHoldingModel.findOne({
+      _id: data.holdingId,
+      userId,
+    });
+
+    if (!holding) {
+      return {
+        success: false,
+        error: "Position not found",
+      };
+    }
+
+    // Recalculate values based on new quantity and average cost
+    const newTotalCost = data.quantity * data.averageCost;
+    
+    // Fetch current market price
+    const quote = await getStockQuote(holding.symbol);
+    const currentPrice = quote?.currentPrice || holding.currentPrice || data.averageCost;
+    const marketValue = data.quantity * currentPrice;
+    const gainLoss = marketValue - newTotalCost;
+    const gainLossPercent = newTotalCost > 0 ? (gainLoss / newTotalCost) * 100 : 0;
+
+    // Update holding
+    holding.quantity = data.quantity;
+    holding.averageCost = data.averageCost;
+    holding.totalCost = newTotalCost;
+    holding.currentPrice = currentPrice;
+    holding.marketValue = marketValue;
+    holding.gainLoss = gainLoss;
+    holding.gainLossPercent = gainLossPercent;
+    holding.lastUpdated = new Date();
+    
+    if (data.notes !== undefined) {
+      holding.notes = data.notes;
+    }
+
+    await holding.save();
+
+    return {
+      success: true,
+      message: `Successfully updated position for ${holding.symbol}`,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || "Failed to update position",
     };
   }
 }
@@ -392,7 +485,6 @@ export async function removePosition(symbol: string): Promise<{
       message: `Removed ${symbol.toUpperCase()} from portfolio`,
     };
   } catch (error: any) {
-    console.error("Error removing position:", error);
     return {
       success: false,
       error: error.message || "Failed to remove position",
@@ -431,7 +523,6 @@ export async function getAssetAllocation(): Promise<{
       allocation,
     };
   } catch (error: any) {
-    console.error("Error calculating asset allocation:", error);
     return {
       success: false,
       error: error.message || "Failed to calculate asset allocation",
@@ -473,7 +564,6 @@ export async function getTransactionHistory(limit: number = 50): Promise<{
       transactions: formattedTransactions as any,
     };
   } catch (error: any) {
-    console.error("Error fetching transaction history:", error);
     return {
       success: false,
       error: error.message || "Failed to fetch transaction history",
@@ -490,7 +580,6 @@ export async function searchStocksAction(query?: string) {
       stocks: results,
     };
   } catch (error) {
-    console.error("Error searching stocks:", error);
     return {
       success: false,
       error: "Failed to search stocks",
@@ -519,7 +608,6 @@ export async function addStockToPortfolio(symbol: string, companyName?: string) 
       requiresDetails: true,
     };
   } catch (error: any) {
-    console.error("Error adding stock to portfolio:", error);
     return {
       success: false,
       error: error.message || "Failed to add stock to portfolio",

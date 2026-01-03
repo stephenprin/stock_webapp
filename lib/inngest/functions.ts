@@ -107,7 +107,6 @@ export const sendDailyNewsSummary = inngest.createFunction(
                 watchlistSymbols,
               });
           } catch (e) {
-          console.error("daily-news: error preparing user news", user.email, e);
               perUser.push({ 
                 user, 
                 articles: [],
@@ -164,7 +163,6 @@ export const sendDailyNewsSummary = inngest.createFunction(
 
                     userNewsSummaries.push({ user, newsContent });
                 } catch (e) {
-        console.error("Failed to summarize news for : ", user.email);
                     userNewsSummaries.push({ user, newsContent: null });
                 }
             }
@@ -383,7 +381,6 @@ export const checkPriceAlerts = inngest.createFunction(
               );
             }
           } catch (error) {
-            console.error(`Error checking subscription for user ${userId}:`, error);
           }
 
           const alertsForUser = triggeredAlerts.filter(
@@ -403,7 +400,6 @@ export const checkPriceAlerts = inngest.createFunction(
             });
           });
         } catch (error) {
-          console.error(`Error fetching user info for ${userId}:`, error);
         }
       }
 
@@ -485,10 +481,6 @@ export const checkPriceAlerts = inngest.createFunction(
               );
             }
           } catch (error) {
-            console.error(
-              `Error sending push notifications for user ${userId}:`,
-              error
-            );
           }
         })
       );
@@ -524,16 +516,8 @@ export const checkPriceAlerts = inngest.createFunction(
             });
 
             if (!smsResult.success) {
-              console.error(
-                `Failed to send SMS to ${phoneNumber} for alert ${alert._id}:`,
-                smsResult.error
-              );
             }
           } catch (error) {
-            console.error(
-              `Error sending SMS for alert ${alert._id}:`,
-              error
-            );
           }
         })
       );
