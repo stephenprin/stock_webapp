@@ -10,24 +10,31 @@ import {
   CommandItem,
 } from "@/components/ui/command";
 import { searchStocksAction, addStockToPortfolio } from "@/lib/actions/portfolio.actions";
+import { addToWatchlist } from "@/lib/actions/watchlist.actions";
 import { toast } from "sonner";
 import { Loader2, Plus, TrendingUp } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useDebounce } from "@/lib/utils/debounce";
+import UpgradeDialog from "@/components/billing/UpgradeDialog";
 
 interface StockSearchCommandProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  mode?: "portfolio" | "watchlist";
+  onWatchlistAdded?: () => void;
 }
 
 export default function StockSearchCommand({
   open,
   onOpenChange,
+  mode = "portfolio",
+  onWatchlistAdded,
 }: StockSearchCommandProps) {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const [stocks, setStocks] = useState<StockWithWatchlistStatus[]>([]);
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
 
   // Search function
   const performSearch = useCallback(
@@ -111,6 +118,29 @@ export default function StockSearchCommand({
     }
   };
 
+  const handleAddToWatchlist = async (
+    e: React.MouseEvent,
+    symbol: string,
+    name: string
+  ) => {
+    e.stopPropagation();
+
+    const result = await addToWatchlist(symbol, name);
+
+    if (result.success) {
+      toast.success(result.message || `${symbol} added to watchlist`);
+      onWatchlistAdded?.();
+      // Keep dialog open so user can add more stocks
+      // Only close if user explicitly closes it
+    } else {
+      if (result.upgradeRequired) {
+        setUpgradeDialogOpen(true);
+      } else {
+        toast.error(result.error || "Failed to add to watchlist");
+      }
+    }
+  };
+
   const handleSelectStock = (symbol: string) => {
     onOpenChange(false);
     router.push(`/search?symbol=${symbol}`);
@@ -121,7 +151,7 @@ export default function StockSearchCommand({
       open={open}
       onOpenChange={onOpenChange}
       title="Search Stocks"
-      description="Search for stocks to add to your portfolio"
+      description={mode === "watchlist" ? "Search for stocks to add to your watchlist" : "Search for stocks to add to your portfolio"}
     >
       <CommandInput
         placeholder="Search stocks by symbol or name..."
@@ -169,9 +199,12 @@ export default function StockSearchCommand({
                       {stock.exchange}
                     </span>
                     <button
-                      onClick={(e) => handleAddToPortfolio(e, stock.symbol, stock.name)}
+                      onClick={(e) => mode === "watchlist" 
+                        ? handleAddToWatchlist(e, stock.symbol, stock.name)
+                        : handleAddToPortfolio(e, stock.symbol, stock.name)
+                      }
                       className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 hover:bg-primary/20 text-primary text-xs transition-colors"
-                      aria-label={`Add ${stock.symbol} to portfolio`}
+                      aria-label={`Add ${stock.symbol} to ${mode === "watchlist" ? "watchlist" : "portfolio"}`}
                     >
                       <Plus className="h-3 w-3" />
                       <span className="hidden sm:inline">Add</span>
@@ -183,6 +216,12 @@ export default function StockSearchCommand({
           </CommandGroup>
         )}
       </CommandList>
+
+      <UpgradeDialog
+        open={upgradeDialogOpen}
+        onOpenChange={setUpgradeDialogOpen}
+        targetPlan="pro"
+      />
     </CommandDialog>
   );
 }

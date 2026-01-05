@@ -4,7 +4,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import { RateLimitModel } from "@/database/models/rate-limit.model";
 import { headers } from "next/headers";
 
-type RateLimitAction = "otp_generate" | "otp_verify" | "otp_resend";
+type RateLimitAction = "otp_generate" | "otp_verify" | "otp_resend" | "chat_message";
 
 
 
@@ -23,6 +23,11 @@ const RATE_LIMIT_CONFIGS: Record<RateLimitAction, RateLimitConfig> = {
     maxAttempts: 2, 
     windowMs: 60 * 60 * 1000, 
     lockDurationMs: 10 * 60 * 1000,
+  },
+  chat_message: {
+    maxAttempts: 30,
+    windowMs: 60 * 1000,
+    lockDurationMs: 5 * 60 * 1000,
   },
 };
 

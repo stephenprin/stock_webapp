@@ -299,6 +299,7 @@ declare global {
 
     type SubscriptionLimits = {
         maxStocks: number | null;
+        maxWatchlistStocks: number | null;
         maxAlerts: number | null; 
         alerts: "basic" | "advanced" | "custom";
         newsPriority: "standard" | "priority" | "premium";

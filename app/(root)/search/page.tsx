@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { getStockQuote, getCompanyProfile } from "@/lib/actions/finnhub.actions";
 import { getNews } from "@/lib/actions/finnhub.actions";
 import { getPortfolioHoldings } from "@/lib/actions/portfolio.actions";
+import { getWatchlistSymbols } from "@/lib/actions/watchlist.actions";
 import TradingViewWidget from "@/components/TradingViewWidget";
 import { CANDLE_CHART_WIDGET_CONFIG, SYMBOL_INFO_WIDGET_CONFIG } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { toast } from "sonner";
 import AddPositionDialog from "@/components/portfolio/AddPositionDialog";
 import CreateAlertDialog from "@/components/alerts/CreateAlertDialog";
 import UpgradeDialog from "@/components/billing/UpgradeDialog";
+import WatchlistButton from "@/components/watchlist/WatchlistButton";
 import { useSubscription } from "@/lib/hooks/useSubscription";
 import { getSubscriptionLimits } from "@/lib/utils/subscription";
 import { formatCurrency, formatPercent } from "@/lib/utils/utils";
@@ -29,6 +31,7 @@ export default function SearchPage() {
   const [profile, setProfile] = useState<any>(null);
   const [news, setNews] = useState<MarketNewsArticle[]>([]);
   const [inPortfolio, setInPortfolio] = useState(false);
+  const [inWatchlist, setInWatchlist] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [createAlertDialogOpen, setCreateAlertDialogOpen] = useState(false);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
@@ -36,6 +39,7 @@ export default function SearchPage() {
   
   const { plan, isFree } = useSubscription();
   const [stockLimit, setStockLimit] = useState<number | null>(null);
+  const [alertLimit, setAlertLimit] = useState<number | null>(null);
 
   useEffect(() => {
     if (!symbol) {
@@ -62,12 +66,15 @@ export default function SearchPage() {
 
     setLoading(true);
     try {
-      const [quoteData, profileData, newsData, portfolioData] = await Promise.all([
+      const [quoteData, profileData, newsData, portfolioData, watchlistResult] = await Promise.all([
         getStockQuote(symbol),
         getCompanyProfile(symbol),
         getNews([symbol]),
         getPortfolioHoldings(),
+        getWatchlistSymbols(),
       ]);
+
+      const watchlistSymbols = watchlistResult.success ? watchlistResult.symbols || [] : [];
 
       if (!quoteData) {
         toast.error(`Could not find data for symbol: ${symbol}. Please check if the symbol is correct.`);
@@ -101,6 +108,16 @@ export default function SearchPage() {
           (h: any) => h.symbol.toUpperCase() === symbol.toUpperCase()
         );
         setInPortfolio(isInPortfolio);
+      }
+
+      // Check if stock is in watchlist
+      if (watchlistSymbols && watchlistSymbols.length > 0) {
+        const isInWatchlist = watchlistSymbols.some(
+          (s: string) => s.toUpperCase() === symbol.toUpperCase()
+        );
+        setInWatchlist(isInWatchlist);
+      } else {
+        setInWatchlist(false);
       }
     } catch (error) {
       toast.error("Failed to load stock data");
@@ -294,40 +311,40 @@ export default function SearchPage() {
   const tradingViewSymbol = getTradingViewSymbol(symbol, profile);
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8 max-w-7xl">
       {/* Header with Symbol Info */}
       <div className="mb-8">
-        <div className="flex items-start justify-between mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
           <div className="flex-1">
-            <div className="flex items-center gap-4 mb-2">
+            <div className="flex items-center gap-3 sm:gap-4 mb-2">
               {profile?.logo && (
                 <img
                   src={profile.logo}
                   alt={profile.name || symbol}
-                  className="w-16 h-16 rounded-lg object-contain"
+                  className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg object-contain flex-shrink-0"
                 />
               )}
-              <div>
-                <h1 className="text-4xl font-bold text-white mb-1">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 truncate">
                   {symbol}
                 </h1>
-                <p className="text-xl text-gray-400">
+                <p className="text-base sm:text-lg lg:text-xl text-gray-400 truncate">
                   {profile?.name || "Loading..."}
                 </p>
               </div>
             </div>
             {profile && (
-              <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-gray-400">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-4 text-xs sm:text-sm text-gray-400">
                 {profile.exchange && (
                   <div className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
+                    <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
                     <span>{profile.exchange}</span>
                   </div>
                 )}
                 {profile.sector && (
                   <div className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4" />
-                    <span>{profile.sector}</span>
+                    <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span className="truncate">{profile.sector}</span>
                   </div>
                 )}
                 {profile.website && (
@@ -337,7 +354,7 @@ export default function SearchPage() {
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 hover:text-yellow-500 transition-colors"
                   >
-                    <Globe className="h-4 w-4" />
+                    <Globe className="h-3 w-3 sm:h-4 sm:w-4" />
                     <span>Website</span>
                     <ExternalLink className="h-3 w-3" />
                   </a>
@@ -345,88 +362,102 @@ export default function SearchPage() {
               </div>
             )}
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             {!inPortfolio && (
               <Button
                 onClick={() => setAddDialogOpen(true)}
-                className="bg-yellow-500 hover:bg-yellow-600 text-gray-900"
+                className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 flex-1 min-w-0 text-sm sm:text-base"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Add to Portfolio
+                <Plus className="h-4 w-4 mr-2 shrink-0" />
+                <span className="hidden sm:inline">Add to Portfolio</span>
+                <span className="sm:hidden">Add</span>
               </Button>
             )}
             {inPortfolio && (
               <Button
                 onClick={() => router.push("/portfolio")}
                 variant="outline"
-                className="border-green-500 text-green-500 hover:bg-green-500/10"
+                className="border-green-500 text-green-500 hover:bg-green-500/10 flex-1 min-w-0 text-sm sm:text-base"
               >
-                View in Portfolio
+                <span className="hidden sm:inline">View in Portfolio</span>
+                <span className="sm:hidden">Portfolio</span>
               </Button>
             )}
+            <div className="flex-1 min-w-0">
+              <WatchlistButton
+                symbol={symbol}
+                company={profile?.name || symbol}
+                isInWatchlist={inWatchlist}
+                type="button"
+                onWatchlistChange={(symbol, isAdded) => {
+                  setInWatchlist(isAdded);
+                }}
+              />
+            </div>
             <Button
               onClick={() => setCreateAlertDialogOpen(true)}
               variant="outline"
-              className="border-green-500 text-green-500 hover:bg-green-500/10"
+              className="border-green-500 text-green-500 hover:bg-green-500/10 flex-1 min-w-0 text-sm sm:text-base"
             >
-              <Bell className="h-4 w-4 mr-2" />
-              Create Alert
+              <Bell className="h-4 w-4 mr-2 shrink-0" />
+              <span className="hidden sm:inline">Create Alert</span>
+              <span className="sm:hidden">Alert</span>
             </Button>
           </div>
         </div>
 
         {/* Price Card */}
         <Card className="bg-gray-800 border-gray-700 mb-6">
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <CardContent className="pt-4 sm:pt-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
               <div>
-                <p className="text-sm text-gray-400 mb-1">Current Price</p>
-                <p className="text-3xl font-bold text-white">
+                <p className="text-xs sm:text-sm text-gray-400 mb-1">Current Price</p>
+                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-white break-words">
                   {formatCurrency(quote.currentPrice)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-400 mb-1">Change</p>
-                <div className={`flex items-center gap-2 ${isPositive ? "text-green-500" : "text-red-500"}`}>
+                <p className="text-xs sm:text-sm text-gray-400 mb-1">Change</p>
+                <div className={`flex items-center gap-1 sm:gap-2 ${isPositive ? "text-green-500" : "text-red-500"}`}>
                   {isPositive ? (
-                    <TrendingUp className="h-5 w-5" />
+                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
                   ) : (
-                    <TrendingDown className="h-5 w-5" />
+                    <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
                   )}
-                  <p className="text-2xl font-bold">
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold break-words">
                     {formatCurrency(Math.abs(quote.change))}
                   </p>
                 </div>
               </div>
               <div>
-                <p className="text-sm text-gray-400 mb-1">Change %</p>
-                <p className={`text-2xl font-bold ${isPositive ? "text-green-500" : "text-red-500"}`}>
+                <p className="text-xs sm:text-sm text-gray-400 mb-1">Change %</p>
+                <p className={`text-lg sm:text-xl lg:text-2xl font-bold ${isPositive ? "text-green-500" : "text-red-500"} break-words`}>
                   {formatPercent(quote.changePercent)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-400 mb-1">Previous Close</p>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-xs sm:text-sm text-gray-400 mb-1">Previous Close</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white break-words">
                   {formatCurrency(quote.previousClose)}
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mt-6 pt-6 border-t border-gray-700">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-700">
               <div>
-                <p className="text-sm text-gray-400 mb-1">Open</p>
-                <p className="text-lg font-medium text-white">
+                <p className="text-xs sm:text-sm text-gray-400 mb-1">Open</p>
+                <p className="text-base sm:text-lg font-medium text-white break-words">
                   {formatCurrency(quote.open)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-400 mb-1">High</p>
-                <p className="text-lg font-medium text-green-500">
+                <p className="text-xs sm:text-sm text-gray-400 mb-1">High</p>
+                <p className="text-base sm:text-lg font-medium text-green-500 break-words">
                   {formatCurrency(quote.high)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-400 mb-1">Low</p>
-                <p className="text-lg font-medium text-red-500">
+                <p className="text-xs sm:text-sm text-gray-400 mb-1">Low</p>
+                <p className="text-base sm:text-lg font-medium text-red-500 break-words">
                   {formatCurrency(quote.low)}
                 </p>
               </div>
