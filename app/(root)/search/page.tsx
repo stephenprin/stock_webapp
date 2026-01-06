@@ -36,6 +36,7 @@ export default function SearchPage() {
   
   const { plan, isFree } = useSubscription();
   const [stockLimit, setStockLimit] = useState<number | null>(null);
+  const [alertLimit, setAlertLimit] = useState<number | null>(null);
 
   useEffect(() => {
     if (!symbol) {

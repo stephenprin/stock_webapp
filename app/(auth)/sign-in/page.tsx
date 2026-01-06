@@ -1,16 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { signInWithEmail } from "@/lib/actions/auth.actions";
+import { signInWithEmail, signInWithGoogle } from "@/lib/actions/auth.actions";
 import Link from "next/link";
 
 const SignIn = () => {
   const router = useRouter();
+  const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
   const {
     register,
     handleSubmit,
@@ -42,8 +44,26 @@ const SignIn = () => {
     }
   };
 
-  const handleGoogleSignIn = () => {
-    toast.info("Google sign-in coming soon");
+  const handleGoogleSignIn = async () => {
+    setIsGoogleSigningIn(true);
+    try {
+      const result = await signInWithGoogle();
+      if (result.success && result.url) {
+        // Redirect to Google OAuth URL
+        window.location.href = result.url;
+      } else {
+        toast.error("Failed to initiate Google sign-in", {
+          description: result.error || "Please try again.",
+        });
+        setIsGoogleSigningIn(false);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to initiate Google sign-in", {
+        description: e instanceof Error ? e.message : "Please try again.",
+      });
+      setIsGoogleSigningIn(false);
+    }
   };
 
   const handleAppleSignIn = () => {
@@ -60,8 +80,9 @@ const SignIn = () => {
           <Button
             type="button"
             onClick={handleGoogleSignIn}
+            disabled={isGoogleSigningIn}
             variant="outline"
-            className="w-full h-12 bg-gray-700 border border-gray-600 text-gray-200 hover:bg-gray-600 flex items-center justify-center gap-3"
+            className="w-full h-12 bg-gray-700 border border-gray-600 text-gray-200 hover:bg-gray-600 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
@@ -81,7 +102,7 @@ const SignIn = () => {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            Continue with Google
+            {isGoogleSigningIn ? "Redirecting..." : "Continue with Google"}
           </Button>
           
           <Button

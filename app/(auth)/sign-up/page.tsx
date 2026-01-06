@@ -16,7 +16,7 @@ import OTPVerificationModal from "@/components/OTPVerificationModal";
 import { toast } from "sonner";
 
 import { useRouter } from "next/navigation";
-import { signUpWithEmail } from "@/lib/actions/auth.actions";
+import { signUpWithEmail, signUpWithGoogle } from "@/lib/actions/auth.actions";
 
 const SignUp = () => {
   const router = useRouter();
@@ -30,6 +30,7 @@ const SignUp = () => {
     riskTolerance: string;
     preferredIndustry: string;
   } | null>(null);
+  const [isGoogleSigningUp, setIsGoogleSigningUp] = useState(false);
 
   const {
     register,
@@ -85,8 +86,26 @@ const SignUp = () => {
     setShowOTPModal(false);
   };
 
-  const handleGoogleSignUp = () => {
-    toast.info("Google sign-up coming soon");
+  const handleGoogleSignUp = async () => {
+    setIsGoogleSigningUp(true);
+    try {
+      const result = await signUpWithGoogle();
+      if (result.success && result.url) {
+        // Redirect to Google OAuth URL
+        window.location.href = result.url;
+      } else {
+        toast.error("Failed to initiate Google sign-up", {
+          description: result.error || "Please try again.",
+        });
+        setIsGoogleSigningUp(false);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to initiate Google sign-up", {
+        description: e instanceof Error ? e.message : "Please try again.",
+      });
+      setIsGoogleSigningUp(false);
+    }
   };
 
   const handleAppleSignUp = () => {
@@ -103,8 +122,9 @@ const SignUp = () => {
         <Button
           type="button"
           onClick={handleGoogleSignUp}
+          disabled={isGoogleSigningUp}
           variant="outline"
-          className="w-full h-12 bg-gray-700 border border-gray-600 text-gray-200 hover:bg-gray-600 flex items-center justify-center gap-3"
+          className="w-full h-12 bg-gray-700 border border-gray-600 text-gray-200 hover:bg-gray-600 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path
@@ -124,7 +144,7 @@ const SignUp = () => {
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
             />
           </svg>
-          Continue with Google
+          {isGoogleSigningUp ? "Redirecting..." : "Continue with Google"}
         </Button>
         
         <Button
@@ -154,7 +174,7 @@ const SignUp = () => {
         <InputField
           name="fullName"
           label="Full Name"
-          placeholder="Mat Prince"
+          placeholder="Enter your full name"
           register={register}
           error={errors.fullName}
           validation={{ required: "Full name is required", minLength: 2 }}
@@ -163,7 +183,7 @@ const SignUp = () => {
         <InputField
           name="email"
           label="Email"
-          placeholder="contact@princeng.com"
+          placeholder="Enter your email"
           register={register}
           error={errors.email}
           validation={{

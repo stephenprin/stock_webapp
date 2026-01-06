@@ -19,11 +19,25 @@ export const sendSignUpEmail = inngest.createFunction(
   { id: "sign-up-email" },
   { event: "app/user.created" },
   async ({ event, step }) => {
-    const userProfile = `
-            - Investment goals: ${event.data.investmentGoals}
-            - Risk tolerance: ${event.data.riskTolerance}
-            - Preferred industry: ${event.data.preferredIndustry}
-        `;
+    // Build user profile string with available data
+    const profileParts = [];
+    
+    if (event.data.country) {
+      profileParts.push(`- Country: ${event.data.country}`);
+    }
+    if (event.data.investmentGoals) {
+      profileParts.push(`- Investment goals: ${event.data.investmentGoals}`);
+    }
+    if (event.data.riskTolerance) {
+      profileParts.push(`- Risk tolerance: ${event.data.riskTolerance}`);
+    }
+    if (event.data.preferredIndustry) {
+      profileParts.push(`- Preferred industry: ${event.data.preferredIndustry}`);
+    }
+
+    const userProfile = profileParts.length > 0 
+      ? profileParts.join("\n") 
+      : "No profile information available";
 
     const prompt = PERSONALIZED_WELCOME_EMAIL_PROMPT.replace(
       "{{userProfile}}",
