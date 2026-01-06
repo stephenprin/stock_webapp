@@ -11,9 +11,10 @@ import AlertsList from "@/components/alerts/AlertsList";
 import CreateAlertDialog from "@/components/alerts/CreateAlertDialog";
 import SubscriptionBadge from "@/components/billing/SubscriptionBadge";
 import UpgradeDialog from "@/components/billing/UpgradeDialog";
-import { useSubscription } from "@/lib/hooks/useSubscription";
+import { getCurrentUserSubscriptionPlan } from "@/lib/actions/subscription.actions";
 import { getSubscriptionLimits } from "@/lib/utils/subscription";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { SubscriptionPlan } from "@/database/models/user-subscription.model";
 
 export default function AlertsPage() {
   const searchParams = useSearchParams();
@@ -23,9 +24,13 @@ export default function AlertsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
-
-  const { plan, isFree, isPro, isEnterprise } = useSubscription();
+  const [plan, setPlan] = useState<SubscriptionPlan>("free");
+  const [planLoading, setPlanLoading] = useState(true);
   const [alertLimit, setAlertLimit] = useState<number | null>(null);
+
+  const isFree = plan === "free";
+  const isPro = plan === "pro";
+  const isEnterprise = plan === "enterprise";
 
   useEffect(() => {
     const upgraded = searchParams.get("upgraded");
@@ -74,21 +79,36 @@ export default function AlertsPage() {
 
   useEffect(() => {
     loadAlerts();
+    loadSubscriptionPlan();
   }, []);
 
-  useEffect(() => {
-    const fetchLimit = async () => {
-      const limits = await getSubscriptionLimits(plan);
+  const loadSubscriptionPlan = async () => {
+    try {
+      setPlanLoading(true);
+      const result = await getCurrentUserSubscriptionPlan();
+      if (result.success && result.plan) {
+        setPlan(result.plan);
+        const limits = await getSubscriptionLimits(result.plan);
+        setAlertLimit(limits.maxAlerts);
+      } else {
+        setPlan("free");
+        const limits = await getSubscriptionLimits("free");
+        setAlertLimit(limits.maxAlerts);
+      }
+    } catch (error) {
+      setPlan("free");
+      const limits = await getSubscriptionLimits("free");
       setAlertLimit(limits.maxAlerts);
-    };
-    if (plan) {
-      fetchLimit();
+    } finally {
+      setPlanLoading(false);
     }
-  }, [plan]);
+  };
 
   const handleAlertCreated = () => {
     setCreateDialogOpen(false);
     loadAlerts();
+    // Refresh subscription plan in case limits changed
+    loadSubscriptionPlan();
   };
 
   const handleAlertUpdated = () => {
@@ -98,78 +118,22 @@ export default function AlertsPage() {
   const activeAlertsCount = alerts.filter((alert) => alert.isActive).length;
   const triggeredAlertsCount = alerts.filter((alert) => alert.triggeredAt).length;
 
-  if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header Skeleton */}
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              <Skeleton className="h-9 w-48" />
-              <Skeleton className="h-6 w-20" />
-            </div>
-            <Skeleton className="h-5 w-64 mb-2" />
-            <Skeleton className="h-4 w-40" />
-          </div>
-          <div className="flex gap-3">
-            <Skeleton className="h-10 w-24" />
-            <Skeleton className="h-10 w-32" />
-          </div>
-        </div>
-
-        {/* Stats Cards Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="bg-gray-800 border-gray-700">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-4 rounded" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-16 mb-2" />
-                <Skeleton className="h-3 w-20" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Table Skeleton */}
-        <Card className="bg-gray-800 border-gray-700">
-          <CardHeader>
-            <Skeleton className="h-6 w-32 mb-2" />
-            <Skeleton className="h-4 w-64" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex gap-4 items-center">
-                  <Skeleton className="h-12 w-20" />
-                  <Skeleton className="h-12 flex-1" />
-                  <Skeleton className="h-12 flex-1" />
-                  <Skeleton className="h-12 flex-1" />
-                  <Skeleton className="h-12 flex-1" />
-                  <Skeleton className="h-12 w-24" />
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       <div className="flex justify-between items-center mb-8">
         <div>
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-3xl font-bold text-white">Price Alerts</h1>
-            <SubscriptionBadge />
+            {planLoading ? (
+              <Skeleton className="h-6 w-20" />
+            ) : (
+              <SubscriptionBadge />
+            )}
           </div>
           <p className="text-gray-400">
             Get notified when stocks hit your target prices
           </p>
-          {isFree && alertLimit !== null && (
+          {!planLoading && isFree && alertLimit !== null && (
             <div className="flex items-center gap-2 mt-2 text-sm text-gray-400">
               <Sparkles className="h-4 w-4" />
               <span>
@@ -193,7 +157,7 @@ export default function AlertsPage() {
             <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-          {isFree && (
+          {!planLoading && isFree && (
             <Button
               variant="outline"
               onClick={() => setUpgradeDialogOpen(true)}
@@ -203,7 +167,7 @@ export default function AlertsPage() {
               Upgrade
             </Button>
           )}
-          {(isPro || isEnterprise || (isFree && activeAlertsCount < (alertLimit || 0))) && (
+          {!planLoading && (isPro || isEnterprise || (isFree && activeAlertsCount < (alertLimit || 0))) && (
             <Button
               onClick={() => setCreateDialogOpen(true)}
               className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-gray-900 font-medium"
@@ -216,60 +180,100 @@ export default function AlertsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card className="bg-gray-800 border-gray-700">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Total Alerts
-            </CardTitle>
-            <Bell className="h-4 w-4 text-gray-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{alerts.length}</div>
-            <p className="text-xs text-gray-500 mt-1">
-              {activeAlertsCount} active
-            </p>
-          </CardContent>
-        </Card>
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="bg-gray-800 border-gray-700">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-4 rounded" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16 mb-2" />
+                <Skeleton className="h-3 w-20" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">
+                Total Alerts
+              </CardTitle>
+              <Bell className="h-4 w-4 text-gray-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-white">{alerts.length}</div>
+              <p className="text-xs text-gray-500 mt-1">
+                {activeAlertsCount} active
+              </p>
+            </CardContent>
+          </Card>
 
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">
+                Active Alerts
+              </CardTitle>
+              <Bell className="h-4 w-4 text-green-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-400">
+                {activeAlertsCount}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {alerts.length - activeAlertsCount} inactive
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">
+                Triggered
+              </CardTitle>
+              <BellOff className="h-4 w-4 text-yellow-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-400">
+                {triggeredAlertsCount}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Alerts that fired
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {loading ? (
         <Card className="bg-gray-800 border-gray-700">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Active Alerts
-            </CardTitle>
-            <Bell className="h-4 w-4 text-green-400" />
+          <CardHeader>
+            <Skeleton className="h-6 w-32 mb-2" />
+            <Skeleton className="h-4 w-64" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-400">
-              {activeAlertsCount}
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex gap-4 items-center">
+                  <Skeleton className="h-12 w-20" />
+                  <Skeleton className="h-12 flex-1" />
+                  <Skeleton className="h-12 flex-1" />
+                  <Skeleton className="h-12 flex-1" />
+                  <Skeleton className="h-12 flex-1" />
+                  <Skeleton className="h-12 w-24" />
+                </div>
+              ))}
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              {alerts.length - activeAlertsCount} inactive
-            </p>
           </CardContent>
         </Card>
-
-        <Card className="bg-gray-800 border-gray-700">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Triggered
-            </CardTitle>
-            <BellOff className="h-4 w-4 text-yellow-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-400">
-              {triggeredAlertsCount}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Alerts that fired
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="mb-8">
-        <AlertsList alerts={alerts} onAlertUpdated={handleAlertUpdated} />
-      </div>
+      ) : (
+        <div className="mb-8">
+          <AlertsList alerts={alerts} onAlertUpdated={handleAlertUpdated} />
+        </div>
+      )}
       <CreateAlertDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}

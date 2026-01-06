@@ -1,6 +1,6 @@
 import { RealTimePrice } from "./RealTimePrice";
 import { getPortfolioHoldings } from "@/lib/actions/portfolio.actions";
-import { getWatchlistSymbolsByEmail } from "@/lib/actions/watchlist.actiond";
+import { getWatchlistSymbolsByEmail } from "@/lib/actions/watchlist.actions";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 

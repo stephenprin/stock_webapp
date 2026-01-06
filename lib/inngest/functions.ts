@@ -1,6 +1,6 @@
 import { getNews, getStockQuote } from "../actions/finnhub.actions";
 import { getAllUsersForNewsEmail, getUserSubscriptionPlan, getPortfolioSymbolsByUserId } from "../actions/user.actions";
-import { getWatchlistSymbolsByEmail } from "../actions/watchlist.actiond";
+import { getWatchlistSymbolsByEmail } from "../actions/watchlist.actions";
 import { sendNewsSummaryEmail, sendWelcomeEmail, sendPriceAlertEmail } from "../nodemailer";
 import { getFormattedTodayDate } from "../utils/utils";
 import { inngest } from "./client";

@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { ConsoleFilter } from "@/components/ConsoleFilter";
 import AutumnProviderWrapper from "@/components/providers/AutumnProviderWrapper";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import ChatWidget from "@/components/support/ChatWidget";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -30,7 +31,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  
   return (
     <html lang="en" className="dark">
       <body
@@ -40,6 +40,7 @@ export default function RootLayout({
           <ConsoleFilter />
           <ServiceWorkerRegister />
           {children}
+          <ChatWidget />
           <Toaster />
         </AutumnProviderWrapper>
       </body>

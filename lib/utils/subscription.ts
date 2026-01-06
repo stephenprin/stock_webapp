@@ -29,6 +29,7 @@ export async function getSubscriptionLimits(plan: SubscriptionPlan): Promise<Sub
     case "free":
       return {
         maxStocks: 5,
+        maxWatchlistStocks: 5,
         maxAlerts: 5,
         alerts: "basic",
         newsPriority: "standard",
@@ -42,6 +43,7 @@ export async function getSubscriptionLimits(plan: SubscriptionPlan): Promise<Sub
     case "pro":
       return {
         maxStocks: null,
+        maxWatchlistStocks: null,
         maxAlerts: null,
         alerts: "advanced",
         newsPriority: "priority",
@@ -55,6 +57,7 @@ export async function getSubscriptionLimits(plan: SubscriptionPlan): Promise<Sub
     case "enterprise":
       return {
         maxStocks: null,
+        maxWatchlistStocks: null,
         maxAlerts: null,
         alerts: "custom",
         newsPriority: "premium",
@@ -177,6 +180,51 @@ export async function enforceAlertLimit(
     return {
       allowed: true,
       currentCount: currentAlertCount,
+      limit: null,
+    };
+  }
+}
+
+export async function enforceWatchlistLimit(
+  currentWatchlistCount: number
+): Promise<{
+  allowed: boolean;
+  reason?: string;
+  upgradeRequired?: boolean;
+  currentCount: number;
+  limit: number | null;
+}> {
+  try {
+    const subscription = await checkSubscriptionStatus();
+    const limits = await getSubscriptionLimits(subscription.plan);
+    
+    if (limits.maxWatchlistStocks === null) {
+      return {
+        allowed: true,
+        currentCount: currentWatchlistCount,
+        limit: null,
+      };
+    }
+    
+    if (currentWatchlistCount >= limits.maxWatchlistStocks) {
+      return {
+        allowed: false,
+        reason: `You've reached the limit of ${limits.maxWatchlistStocks} stocks for your ${subscription.plan} plan. Upgrade to Pro for unlimited watchlist tracking.`,
+        upgradeRequired: true,
+        currentCount: currentWatchlistCount,
+        limit: limits.maxWatchlistStocks,
+      };
+    }
+    
+    return {
+      allowed: true,
+      currentCount: currentWatchlistCount,
+      limit: limits.maxWatchlistStocks,
+    };
+  } catch (error) {
+    return {
+      allowed: true,
+      currentCount: currentWatchlistCount,
       limit: null,
     };
   }
